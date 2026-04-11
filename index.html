@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="theme-color" content="#ffffff" />
+  <title>Ateliê Tati Brandão</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ══════════════════════════════════
+     OVERLAY DE CARREGAMENTO
+══════════════════════════════════ -->
+<div id="loading-overlay">
+  <div class="loading-inner">
+    <div class="loading-logo">Ateliê Tati Brandão</div>
+    <div class="loading-spinner"></div>
+  </div>
+</div>
+
+<div id="app">
+
+  <!-- ══════════════════════════════════
+       TELA: LOGIN
+  ══════════════════════════════════ -->
+  <div id="s-login" class="screen active">
+    <div class="login-wrap">
+      <div class="login-logo">Ateliê Tati Brandão</div>
+      <div class="login-sub">Gestão financeira da equipe</div>
+      <div class="login-card">
+        <label>Colaboradoras</label>
+        <select id="login-user">
+          <option value="">Selecione...</option>
+          <option value="fabiola">Fabíola</option>
+          <option value="kaylane">Kaylane</option>
+          <option value="tati">Tati</option>
+          <option value="salao">Perfil Salão (proprietária)</option>
+        </select>
+        <label>Senha</label>
+        <input type="password" id="login-pass" placeholder="••••••" autocomplete="current-password" />
+        <button class="login-btn" onclick="doLogin()">Entrar</button>
+        <div class="login-err" id="login-err"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════
+       TELA: COLABORADORA
+  ══════════════════════════════════ -->
+  <div id="s-colab" class="screen">
+    <div class="topbar">
+      <div class="topbar-title">✦ Ateliê Tati Brandão</div>
+      <div class="topbar-right">
+        <span class="topbar-user" id="colab-name-top"></span>
+        <button class="topbar-out" onclick="logout()">Sair</button>
+      </div>
+    </div>
+    <div class="nav">
+      <button class="nav-btn active" onclick="switchTab('colab','inicio')">Início</button>
+      <button class="nav-btn" onclick="switchTab('colab','registrar')">Registrar</button>
+      <button class="nav-btn" onclick="switchTab('colab','historico')">Histórico</button>
+    </div>
+    <div class="content">
+
+      <!-- INÍCIO -->
+      <div class="tab-content active" id="colab-inicio">
+        <div class="quinzena-badge" id="colab-quinzena-badge"></div>
+        <div class="cards-row">
+          <div class="card">
+            <div class="card-label">Saldo líquido hoje</div>
+            <div class="card-val green" id="c-saldo-dia">R$ 0,00</div>
+          </div>
+          <div class="card">
+            <div class="card-label">Saldo a receber</div>
+            <div class="card-val rose" id="c-saldo-quinzena">R$ 0,00</div>
+          </div>
+          <div class="card card-full">
+            <div class="card-label">Ganhos brutos (quinzena)</div>
+            <div class="card-val" id="c-bruto">R$ 0,00</div>
+          </div>
+        </div>
+        <div class="section-head">Movimentações desta quinzena</div>
+        <div class="card" style="padding: 0 14px">
+          <div id="colab-movs"></div>
+        </div>
+      </div>
+
+      <!-- REGISTRAR -->
+      <div class="tab-content" id="colab-registrar">
+        <div class="toggle-row">
+          <button class="toggle-btn active" id="tog-ganho" onclick="setTipo('ganho')">Ganho</button>
+          <button class="toggle-btn" id="tog-vale" onclick="setTipo('vale')">Vale</button>
+        </div>
+        <div class="form-group">
+          <label>Data do registro</label>
+          <input type="date" id="r-data" />
+        </div>
+        <div id="form-ganho">
+          <div class="form-group">
+            <label>Nome da cliente</label>
+            <input type="text" id="r-cliente" placeholder="Ex: Maria Silva" autocomplete="off" />
+          </div>
+          <div class="form-group">
+            <label>Valor (R$)</label>
+            <input type="number" id="r-valor-g" placeholder="0,00" min="0" step="0.01" inputmode="decimal" />
+          </div>
+        </div>
+        <div id="form-vale" style="display:none">
+          <div class="form-group">
+            <label>Descrição</label>
+            <input type="text" id="r-desc-v" placeholder="Ex: Adiantamento" autocomplete="off" />
+          </div>
+          <div class="form-group">
+            <label>Valor (R$)</label>
+            <input type="number" id="r-valor-v" placeholder="0,00" min="0" step="0.01" inputmode="decimal" />
+          </div>
+        </div>
+        <button class="submit-btn" onclick="registrar()">Registrar</button>
+        <div class="success-msg" id="reg-msg"></div>
+      </div>
+
+      <!-- HISTÓRICO -->
+      <div class="tab-content" id="colab-historico">
+        <div class="section-head">Histórico por quinzena</div>
+        <div id="colab-hist-quinzenas"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════
+       TELA: PROPRIETÁRIA
+  ══════════════════════════════════ -->
+  <div id="s-dona" class="screen">
+    <div class="topbar">
+      <div class="topbar-title">✦ Ateliê Tati Brandão</div>
+      <div class="topbar-right">
+        <span class="topbar-user">Proprietária</span>
+        <button class="topbar-out" onclick="logout()">Sair</button>
+      </div>
+    </div>
+    <div class="nav">
+      <button class="nav-btn active" onclick="switchTab('dona','painel')">Painel</button>
+      <button class="nav-btn" onclick="switchTab('dona','equipe')">Equipe</button>
+      <button class="nav-btn" onclick="switchTab('dona','despesas')">Despesas</button>
+      <button class="nav-btn" onclick="switchTab('dona','caixa')">Caixa</button>
+    </div>
+    <div class="content">
+
+      <!-- PAINEL -->
+      <div class="tab-content active" id="dona-painel">
+        <div class="quinzena-badge" id="dona-quinzena-badge"></div>
+        <div class="cards-row">
+          <div class="card">
+            <div class="card-label">30% salão (hoje)</div>
+            <div class="card-val rose" id="d-30-dia">R$ 0,00</div>
+          </div>
+          <div class="card">
+            <div class="card-label">30% salão (quinzena)</div>
+            <div class="card-val rose" id="d-30-quin">R$ 0,00</div>
+          </div>
+          <div class="card">
+            <div class="card-label">Total bruto equipe</div>
+            <div class="card-val" id="d-bruto-q">R$ 0,00</div>
+          </div>
+          <div class="card">
+            <div class="card-label">Despesas (quinzena)</div>
+            <div class="card-val" id="d-desp-q">R$ 0,00</div>
+          </div>
+        </div>
+        <div class="section-head">Movimentações desta quinzena</div>
+        <div class="card" style="padding: 0 14px">
+          <div id="dona-movs"></div>
+        </div>
+      </div>
+
+      <!-- EQUIPE -->
+      <div class="tab-content" id="dona-equipe">
+        <div id="dona-equipe-list"></div>
+      </div>
+
+      <!-- DESPESAS -->
+      <div class="tab-content" id="dona-despesas">
+        <div class="form-group">
+          <label>Descrição</label>
+          <input type="text" id="d-desc" placeholder="Ex: Conta de água" autocomplete="off" />
+        </div>
+        <div class="form-group">
+          <label>Valor (R$)</label>
+          <input type="number" id="d-valor" placeholder="0,00" min="0" step="0.01" inputmode="decimal" />
+        </div>
+        <button class="submit-btn" onclick="addDespesa()">Registrar despesa</button>
+        <div class="success-msg" id="desp-msg"></div>
+        <div class="section-head" style="margin-top: 1rem">Despesas registradas</div>
+        <div class="card" style="padding: 0 14px">
+          <div id="dona-desp-list"></div>
+        </div>
+      </div>
+
+      <!-- CAIXA -->
+      <div class="tab-content" id="dona-caixa">
+        <div class="caixa-card">
+          <div class="caixa-label">Saldo em caixa</div>
+          <div class="caixa-val" id="caixa-val">R$ 0,00</div>
+        </div>
+        <div class="cards-row">
+          <div class="card">
+            <div class="card-label">Entrou hoje (30%)</div>
+            <div class="card-val" id="cx-hoje">R$ 0,00</div>
+          </div>
+          <div class="card">
+            <div class="card-label">Fechamentos anteriores</div>
+            <div class="card-val" id="cx-ant">R$ 0,00</div>
+          </div>
+        </div>
+        <button class="fechar-btn" onclick="fecharCaixa()">Fechar caixa do dia</button>
+        <div class="success-msg" id="cx-msg"></div>
+        <div class="section-head" style="margin-top: 1rem">Histórico de fechamentos</div>
+        <div class="card" style="padding: 0 14px">
+          <div id="cx-hist"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════
+       MODAL: EDIÇÃO (proprietária)
+  ══════════════════════════════════ -->
+  <div class="modal-bg" id="modal-edit">
+    <div class="modal">
+      <div class="modal-title" id="modal-title">Editar registro</div>
+      <div class="form-group">
+        <label>Descrição / cliente</label>
+        <input type="text" id="m-desc" autocomplete="off" />
+      </div>
+      <div class="form-group">
+        <label>Valor (R$)</label>
+        <input type="number" id="m-val" step="0.01" inputmode="decimal" />
+      </div>
+      <div class="form-group">
+        <label>Data do registro</label>
+        <input type="date" id="m-data" />
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
+        <button class="btn-save" onclick="saveEdit()">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- #app -->
+
+<!-- Supabase CDN -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="script.js"></script>
+</body>
+</html>

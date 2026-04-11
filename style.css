@@ -1,0 +1,791 @@
+/* ══════════════════════════════════════════
+   SALÃO — Gestão Financeira
+   style.css
+══════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@400;500&display=swap');
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ── VARIÁVEIS ── */
+:root {
+  --rose:       #0222d7;
+  --rose-light: #a4b5ed;
+  --rose-mid:   #a0cae8;
+  --gold:       #b8860b;
+  --gold-light: #fdf3dc;
+  --text:       #1a1a1a;
+  --muted:      #888;
+  --border:     #e8e0e4;
+  --bg:         #ffffff;
+  --bg2:        #f7f9fa;
+  --danger:     #c0392b;
+  --success:    #2d7a4f;
+}
+
+/* ── BASE ── */
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: #f3eef0;
+  min-height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 1rem;
+}
+
+#app {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  background: var(--bg);
+  border: 0.5px solid var(--border);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 4px 32px rgba(192, 82, 110, 0.08);
+  min-height: 600px;
+}
+
+/* ══════════════════════════════════════════
+   SCREENS
+══════════════════════════════════════════ */
+.screen {
+  display: none;
+  flex-direction: column;
+  min-height: 600px;
+}
+.screen.active {
+  display: flex;
+}
+
+/* ══════════════════════════════════════════
+   LOGIN
+══════════════════════════════════════════ */
+.login-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem 1.5rem;
+  background: var(--bg);
+}
+
+.login-logo {
+  font-family: 'DM Serif Display', serif;
+  font-size: 36px;
+  color: var(--rose);
+  letter-spacing: -0.5px;
+  margin-bottom: 4px;
+}
+
+.login-sub {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 2rem;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 320px;
+  background: var(--bg2);
+  border: 0.5px solid var(--border);
+  border-radius: 16px;
+  padding: 1.5rem;
+}
+
+.login-card label {
+  font-size: 12px;
+  color: var(--muted);
+  display: block;
+  margin-bottom: 4px;
+  margin-top: 12px;
+}
+.login-card label:first-of-type {
+  margin-top: 0;
+}
+
+.login-card input,
+.login-card select {
+  width: 100%;
+  padding: 9px 12px;
+  border: 0.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+  font-family: 'DM Sans', sans-serif;
+  outline: none;
+}
+.login-card input:focus,
+.login-card select:focus {
+  border-color: var(--rose-mid);
+}
+
+.login-btn {
+  width: 100%;
+  margin-top: 1rem;
+  padding: 11px;
+  background: var(--rose);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  transition: background .15s;
+}
+.login-btn:hover {
+  background: #419ca8;
+}
+
+.login-err {
+  color: var(--danger);
+  font-size: 12px;
+  margin-top: 8px;
+  text-align: center;
+  min-height: 16px;
+}
+
+/* ══════════════════════════════════════════
+   TOPBAR
+══════════════════════════════════════════ */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 0.5px solid var(--border);
+  background: var(--bg);
+}
+
+.topbar-title {
+  font-family: 'DM Serif Display', serif;
+  font-size: 20px;
+  color: var(--rose);
+}
+
+.topbar-user {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.topbar-out {
+  background: none;
+  border: 0.5px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+}
+.topbar-out:hover {
+  background: var(--bg2);
+}
+
+/* ══════════════════════════════════════════
+   NAV
+══════════════════════════════════════════ */
+.nav {
+  display: flex;
+  border-bottom: 0.5px solid var(--border);
+  background: var(--bg);
+}
+
+.nav-btn {
+  flex: 1;
+  padding: 10px 4px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  transition: color .15s;
+}
+.nav-btn.active {
+  color: var(--rose);
+  border-bottom-color: var(--rose);
+}
+
+/* ══════════════════════════════════════════
+   CONTENT & TABS
+══════════════════════════════════════════ */
+.content {
+  flex: 1;
+  padding: 1rem;
+  background: var(--bg2);
+  overflow-y: auto;
+}
+
+.tab-content {
+  display: none;
+}
+.tab-content.active {
+  display: block;
+}
+
+/* ══════════════════════════════════════════
+   CARDS / MÉTRICAS
+══════════════════════════════════════════ */
+.cards-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 1rem;
+}
+
+.card {
+  background: var(--bg);
+  border: 0.5px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+
+.card-full {
+  grid-column: 1 / -1;
+}
+
+.card-label {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 4px;
+}
+
+.card-val {
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--text);
+}
+.card-val.green { color: var(--success); }
+.card-val.rose  { color: var(--rose); }
+
+/* ── LABELS / BADGES ── */
+.section-head {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  margin: 1rem 0 6px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.quinzena-badge {
+  display: inline-block;
+  font-size: 11px;
+  background: var(--rose-light);
+  color: var(--rose);
+  padding: 3px 10px;
+  border-radius: 20px;
+  margin-bottom: 12px;
+}
+
+/* ══════════════════════════════════════════
+   MOVIMENTAÇÕES
+══════════════════════════════════════════ */
+.mov-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 10px 0;
+  border-bottom: 0.5px solid var(--border);
+}
+.mov-item:last-child {
+  border-bottom: none;
+}
+
+.mov-desc {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.mov-meta {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.mov-val {
+  font-size: 13px;
+  font-weight: 500;
+  text-align: right;
+}
+.mov-val.pos { color: var(--success); }
+.mov-val.neg { color: var(--danger); }
+
+.mov-type {
+  font-size: 10px;
+  text-align: right;
+  color: var(--muted);
+}
+
+.empty-state {
+  text-align: center;
+  padding: 2rem;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+/* ══════════════════════════════════════════
+   FORMULÁRIOS
+══════════════════════════════════════════ */
+.form-group {
+  margin-bottom: 10px;
+}
+
+.form-group label {
+  font-size: 12px;
+  color: var(--muted);
+  display: block;
+  margin-bottom: 4px;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+  width: 100%;
+  padding: 9px 12px;
+  border: 0.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+  font-family: 'DM Sans', sans-serif;
+  outline: none;
+}
+.form-group input:focus,
+.form-group select:focus {
+  border-color: var(--rose-mid);
+}
+
+.toggle-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.toggle-btn {
+  flex: 1;
+  padding: 9px;
+  border: 0.5px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  transition: all .15s;
+}
+.toggle-btn.active {
+  background: var(--rose-light);
+  color: var(--rose);
+  border-color: var(--rose-mid);
+}
+
+.submit-btn {
+  width: 100%;
+  padding: 11px;
+  background: var(--rose);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  margin-top: 4px;
+  font-family: 'DM Sans', sans-serif;
+  transition: background .15s;
+}
+.submit-btn:hover {
+  background: #a8415c;
+}
+
+.success-msg {
+  color: var(--success);
+  font-size: 13px;
+  text-align: center;
+  margin-top: 8px;
+  min-height: 18px;
+}
+
+/* ══════════════════════════════════════════
+   ABA EQUIPE (proprietária)
+══════════════════════════════════════════ */
+.colab-card {
+  background: var(--bg);
+  border: 0.5px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+
+.colab-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.colab-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 3px;
+}
+.colab-row span:last-child {
+  color: var(--text);
+  font-weight: 500;
+}
+
+.edit-btn {
+  font-size: 11px;
+  padding: 3px 10px;
+  border: 0.5px solid var(--border);
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+}
+.edit-btn:hover {
+  background: var(--bg2);
+  color: var(--rose);
+}
+
+/* ══════════════════════════════════════════
+   ABA CAIXA (proprietária)
+══════════════════════════════════════════ */
+.caixa-card {
+  background: var(--gold-light);
+  border: 0.5px solid #e8d9a0;
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+
+.caixa-label {
+  font-size: 11px;
+  color: var(--gold);
+  margin-bottom: 4px;
+}
+
+.caixa-val {
+  font-size: 28px;
+  font-weight: 500;
+  color: var(--gold);
+}
+
+.fechar-btn {
+  width: 100%;
+  padding: 11px;
+  background: var(--gold);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+}
+.fechar-btn:hover {
+  opacity: .9;
+}
+
+/* ══════════════════════════════════════════
+   MODAL DE EDIÇÃO
+══════════════════════════════════════════ */
+.modal-bg {
+  display: none;
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, .35);
+  z-index: 100;
+  align-items: center;
+  justify-content: center;
+}
+.modal-bg.open {
+  display: flex;
+}
+
+.modal {
+  background: var(--bg);
+  border-radius: 16px;
+  padding: 1.25rem;
+  width: 90%;
+  max-width: 320px;
+}
+
+.modal-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 1rem;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.modal-actions button {
+  flex: 1;
+  padding: 9px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.btn-cancel {
+  background: none;
+  border: 0.5px solid var(--border);
+  color: var(--muted);
+}
+
+.btn-save {
+  background: var(--rose);
+  border: none;
+  color: #fff;
+  font-weight: 500;
+}
+.btn-save:hover {
+  background: #419ca8;
+}
+
+/* ══════════════════════════════════════════
+   HISTÓRICO POR QUINZENA — Accordion
+══════════════════════════════════════════ */
+
+.hist-group {
+  background: var(--bg);
+  border: 0.5px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 10px;
+  overflow: hidden;
+}
+
+.hist-group-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  gap: 8px;
+}
+.hist-group-header:hover {
+  background: var(--bg2);
+}
+
+.hist-group-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hist-group-period {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.hist-badge-atual {
+  font-size: 10px;
+  background: var(--rose-light);
+  color: var(--rose);
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-weight: 500;
+}
+
+.hist-group-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.hist-group-liq {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--success);
+}
+
+.hist-group-arrow {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+/* Corpo do accordion — fechado por padrão */
+.hist-group-body {
+  display: none;
+  border-top: 0.5px solid var(--border);
+}
+.hist-group-body.open {
+  display: block;
+}
+
+.hist-group-totals {
+  display: flex;
+  gap: 12px;
+  padding: 8px 14px;
+  background: var(--bg2);
+  border-bottom: 0.5px solid var(--border);
+  font-size: 11px;
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+.hist-group-totals span {
+  white-space: nowrap;
+}
+
+/* ══════════════════════════════════════════
+   MOBILE — melhorias de toque e layout
+══════════════════════════════════════════ */
+
+/* Garante que o app ocupe toda a tela no celular */
+html, body {
+  height: 100%;
+  overflow: hidden;
+}
+
+#app {
+  max-width: 100%;
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+  height: 100vh;
+  height: 100dvh; /* dynamic viewport height — respeita teclado virtual */
+  display: flex;
+  flex-direction: column;
+}
+
+.screen {
+  height: 100%;
+  overflow: hidden;
+}
+
+.screen.active {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.content {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 2rem; /* espaço extra no fundo para celular */
+}
+
+/* Botões maiores para toque */
+.nav-btn {
+  padding: 12px 4px;
+  font-size: 13px;
+}
+
+.submit-btn,
+.login-btn,
+.fechar-btn {
+  padding: 14px;
+  font-size: 15px;
+}
+
+.toggle-btn {
+  padding: 12px;
+}
+
+/* Inputs maiores para toque */
+.form-group input,
+.form-group select,
+.login-card input,
+.login-card select {
+  padding: 12px;
+  font-size: 16px; /* evita zoom automático no iOS */
+  height: 48px;
+}
+
+/* Botão editar maior */
+.edit-btn {
+  padding: 6px 14px;
+  font-size: 12px;
+}
+
+/* Card de métricas menor no mobile */
+.card-val { font-size: 20px; }
+
+/* ══════════════════════════════════════════
+   LOADING OVERLAY
+══════════════════════════════════════════ */
+#loading-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(255,255,255,0.88);
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.loading-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.loading-logo {
+  font-family: 'DM Serif Display', serif;
+  font-size: 22px;
+  color: var(--rose);
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border);
+  border-top-color: var(--rose);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Tablet / desktop: restaura aparência de card centralizado */
+@media (min-width: 480px) {
+  html, body { overflow: auto; }
+  #app {
+    max-width: 420px;
+    border-radius: 20px;
+    border: 0.5px solid var(--border);
+    box-shadow: 0 4px 32px rgba(192,82,110,0.08);
+    height: auto;
+    min-height: 600px;
+    margin: 1rem auto;
+  }
+  .screen { height: auto; min-height: 600px; }
+  .screen.active { height: auto; }
+}
