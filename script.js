@@ -27,6 +27,11 @@ const COLABS = ['fabiola', 'kaylane', 'tati'];
 
 let currentUser      = null;
 let editingId        = null;
+let editingDespesaId = null;
+
+// Offset de navegação: 0 = período atual, -1 = anterior, etc.
+let colabQuinzenaOffset = 0;
+let donaMesOffset       = 0;
 
 /* ══════════════════════════════════════════
    ESTADO (cache local — carregado do Supabase)
@@ -161,20 +166,83 @@ function agruparPorQuinzena(list) {
 }
 
 /* ══════════════════════════════════════════
+   HELPERS — MÊS (para perfil dona)
+══════════════════════════════════════════ */
+
+/** Retorna { s, e, label } para o mês com offset relativo ao atual */
+function getMesOffset(offset) {
+  const now = new Date();
+  const y   = now.getFullYear();
+  const m   = now.getMonth() + offset; // pode ser negativo, JS normaliza
+  const s   = new Date(y, m, 1);
+  const e   = new Date(y, m + 1, 0);  // último dia do mês
+  const label = s.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  return { s, e, label: label.charAt(0).toUpperCase() + label.slice(1) };
+}
+
+function inMes(ts, mes) {
+  return ts >= mes.s.getTime() && ts <= mes.e.getTime() + 86_399_999;
+}
+
+/** Agrupa records/despesas por mês (YYYY-MM) para o histórico */
+function agruparPorMes(recList, despList) {
+  const map = new Map();
+
+  const addToMap = (ts, cb) => {
+    const d   = new Date(ts);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    if (!map.has(key)) {
+      const label = d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+      map.set(key, {
+        key,
+        label: label.charAt(0).toUpperCase() + label.slice(1),
+        s: new Date(d.getFullYear(), d.getMonth(), 1),
+        records: [],
+        despesas: [],
+      });
+    }
+    cb(map.get(key));
+  };
+
+  recList.forEach(r  => addToMap(r.ts,  g => g.records.push(r)));
+  despList.forEach(d => addToMap(d.ts,  g => g.despesas.push(d)));
+
+  return Array.from(map.values()).sort((a, b) => b.s - a.s);
+}
+
+/* ══════════════════════════════════════════
+   NAVEGAÇÃO DE PERÍODO
+══════════════════════════════════════════ */
+
+function colabNavQuinzena(dir) {
+  colabQuinzenaOffset += dir;
+  // Não permite avançar além do período atual
+  if (colabQuinzenaOffset > 0) colabQuinzenaOffset = 0;
+  renderColab();
+}
+
+function donaNavMes(dir) {
+  donaMesOffset += dir;
+  if (donaMesOffset > 0) donaMesOffset = 0;
+  renderDonaPainel();
+}
+
+/* ══════════════════════════════════════════
    SUPABASE — CARREGAR DADOS
 ══════════════════════════════════════════ */
 
 /** Converte linha do Supabase (tabela records) para objeto interno */
 function rowToRecord(row) {
   return {
-    id:      row.id,
-    user:    row.user_key,
-    type:    row.type,
-    desc:    row.descricao,
-    cliente: row.cliente || '',
-    val:     parseFloat(row.valor),
-    ts:      dateDBToTs(row.data_ref),
-    fechado: row.fechado || false,
+    id:           row.id,
+    user:         row.user_key,
+    type:         row.type,
+    desc:         row.descricao,
+    cliente:      row.cliente || '',
+    val:          parseFloat(row.valor),
+    bronze_salao: parseFloat(row.bronze_salao) || 0,
+    ts:           dateDBToTs(row.data_ref),
+    fechado:      row.fechado || false,
   };
 }
 
@@ -227,13 +295,14 @@ async function loadAll() {
 
 async function insertRecord(obj) {
   const { data, error } = await db.from('records').insert({
-    user_key:  obj.user,
-    type:      obj.type,
-    descricao: obj.desc,
-    cliente:   obj.cliente || '',
-    valor:     obj.val,
-    data_ref:  tsToDateDB(obj.ts),
-    fechado:   false,
+    user_key:     obj.user,
+    type:         obj.type,
+    descricao:    obj.desc,
+    cliente:      obj.cliente || '',
+    valor:        obj.val,
+    bronze_salao: obj.bronze_salao || 0,
+    data_ref:     tsToDateDB(obj.ts),
+    fechado:      false,
   }).select().single();
 
   if (error) throw error;
@@ -272,6 +341,16 @@ async function insertFechamento(valor) {
   return rowToFechamento(data);
 }
 
+async function updateDespesa(obj) {
+  const { error } = await db.from('despesas').update({
+    descricao: obj.desc,
+    valor:     obj.val,
+    data_ref:  tsToDateDB(obj.ts),
+  }).eq('id', obj.id);
+
+  if (error) throw error;
+}
+
 /* ══════════════════════════════════════════
    AUTH
 ══════════════════════════════════════════ */
@@ -304,6 +383,8 @@ async function doLogin() {
 function logout() {
   currentUser = null;
   records = []; despesas = []; caixaFechamentos = [];
+  colabQuinzenaOffset = 0;
+  donaMesOffset       = 0;
   showScreen('s-login');
   document.getElementById('login-pass').value = '';
   document.getElementById('login-user').value = '';
@@ -346,23 +427,38 @@ function switchTab(screen, tab) {
 }
 
 /* ══════════════════════════════════════════
-   TOGGLE GANHO / VALE
+   TOGGLE GANHO / VALE / BRONZE
 ══════════════════════════════════════════ */
 let regTipo = 'ganho';
 
 function setTipo(t) {
   regTipo = t;
-  document.getElementById('tog-ganho').classList.toggle('active', t === 'ganho');
-  document.getElementById('tog-vale').classList.toggle('active',  t === 'vale');
-  document.getElementById('form-ganho').style.display = t === 'ganho' ? 'block' : 'none';
-  document.getElementById('form-vale').style.display  = t === 'vale'  ? 'block' : 'none';
+  document.getElementById('tog-ganho').classList.toggle('active',  t === 'ganho');
+  document.getElementById('tog-vale').classList.toggle('active',   t === 'vale');
+  document.getElementById('tog-bronze').classList.toggle('active', t === 'bronze');
+  document.getElementById('form-ganho').style.display  = t === 'ganho'  ? 'block' : 'none';
+  document.getElementById('form-vale').style.display   = t === 'vale'   ? 'block' : 'none';
+  document.getElementById('form-bronze').style.display = t === 'bronze' ? 'block' : 'none';
+}
+
+/** Atualiza o preview em tempo real ao digitar o valor do Bronze */
+function previewBronze() {
+  const val  = parseFloat(document.getElementById('r-valor-b').value);
+  const prev = document.getElementById('bronze-preview');
+  if (!isNaN(val) && val > 10) {
+    prev.style.display = 'flex';
+    document.getElementById('bp-colab').textContent = brl(10);
+    document.getElementById('bp-salao').textContent = brl(val - 10);
+  } else {
+    prev.style.display = 'none';
+  }
 }
 
 /* ══════════════════════════════════════════
    REGISTRAR (colaboradora)
 ══════════════════════════════════════════ */
 async function registrar() {
-  let val, desc, cliente = '';
+  let val, desc, cliente = '', bronze_salao = 0;
 
   if (regTipo === 'ganho') {
     val     = parseFloat(document.getElementById('r-valor-g').value);
@@ -372,13 +468,25 @@ async function registrar() {
       alert('Preencha o nome da cliente e o valor.');
       return;
     }
-  } else {
+
+  } else if (regTipo === 'vale') {
     val  = parseFloat(document.getElementById('r-valor-v').value);
     desc = document.getElementById('r-desc-v').value.trim();
     if (!desc || isNaN(val) || val <= 0) {
       alert('Preencha a descrição e o valor.');
       return;
     }
+
+  } else if (regTipo === 'bronze') {
+    const total = parseFloat(document.getElementById('r-valor-b').value);
+    cliente     = document.getElementById('r-cliente-b').value.trim();
+    if (!cliente || isNaN(total) || total <= 10) {
+      alert('Preencha o nome da cliente e um valor maior que R$ 10,00.');
+      return;
+    }
+    val          = 10;           // colaboradora recebe R$10 fixo, sem desconto de 30%
+    bronze_salao = total - 10;   // excedente vai direto para o salão
+    desc         = 'Bronze — ' + cliente;
   }
 
   const ts = dateInputToTs(document.getElementById('r-data').value);
@@ -391,15 +499,19 @@ async function registrar() {
       desc,
       cliente,
       val,
+      bronze_salao,
       ts,
     });
 
     records.unshift(novo);
 
-    document.getElementById('r-cliente').value = '';
-    document.getElementById('r-valor-g').value = '';
-    document.getElementById('r-desc-v').value  = '';
-    document.getElementById('r-valor-v').value = '';
+    document.getElementById('r-cliente').value   = '';
+    document.getElementById('r-valor-g').value   = '';
+    document.getElementById('r-desc-v').value    = '';
+    document.getElementById('r-valor-v').value   = '';
+    document.getElementById('r-cliente-b').value = '';
+    document.getElementById('r-valor-b').value   = '';
+    document.getElementById('bronze-preview').style.display = 'none';
     setDefaultDate();
 
     const msg = document.getElementById('reg-msg');
@@ -421,23 +533,48 @@ async function registrar() {
 function renderColab() {
   if (!currentUser || currentUser.role !== 'colab') return;
 
-  const q        = getQuinzena(Date.now());
+  // Calcula a quinzena com base no offset de navegação
+  const refTs = (() => {
+    if (colabQuinzenaOffset === 0) return Date.now();
+    // Recua N quinzenas a partir de hoje
+    let ts = Date.now();
+    for (let i = 0; i < Math.abs(colabQuinzenaOffset); i++) {
+      const q  = getQuinzena(ts);
+      ts = q.s.getTime() - 1; // 1ms antes do início da quinzena atual = quinzena anterior
+    }
+    return ts;
+  })();
+
+  const q        = getQuinzena(refTs);
+  const isAtual  = colabQuinzenaOffset === 0;
+
   const myRec    = records.filter(r => r.user === currentUser.key);
   const qRec     = myRec.filter(r => inQuinzena(r.ts, q));
   const todayRec = myRec.filter(r => isToday(r.ts));
 
-  const brutoQ   = qRec.filter(r => r.type === 'ganho').reduce((s, r) => s + r.val, 0);
-  const valesQ   = qRec.filter(r => r.type === 'vale').reduce((s, r) => s + r.val, 0);
-  const liquidoQ = brutoQ * 0.7 - valesQ;
+  // Quinzena selecionada
+  const brutoNormal = qRec.filter(r => r.type === 'ganho').reduce((s, r) => s + r.val, 0);
+  const brutoBronze = qRec.filter(r => r.type === 'bronze').reduce((s, r) => s + r.val, 0);
+  const valesQ      = qRec.filter(r => r.type === 'vale').reduce((s, r) => s + r.val, 0);
+  const liquidoQ    = (brutoNormal * 0.7) + brutoBronze - valesQ;
 
-  const brutoHoje = todayRec.filter(r => r.type === 'ganho').reduce((s, r) => s + r.val, 0);
-  const valesHoje = todayRec.filter(r => r.type === 'vale').reduce((s, r) => s + r.val, 0);
-  const diaLiq    = brutoHoje * 0.7 - valesHoje;
+  // Hoje (só faz sentido na quinzena atual)
+  const brutoNormalHoje = todayRec.filter(r => r.type === 'ganho').reduce((s, r) => s + r.val, 0);
+  const brutoBronzeHoje = todayRec.filter(r => r.type === 'bronze').reduce((s, r) => s + r.val, 0);
+  const valesHoje       = todayRec.filter(r => r.type === 'vale').reduce((s, r) => s + r.val, 0);
+  const diaLiq          = isAtual ? (brutoNormalHoje * 0.7) + brutoBronzeHoje - valesHoje : null;
 
-  document.getElementById('colab-quinzena-badge').textContent = 'Quinzena: ' + q.label;
-  document.getElementById('c-saldo-dia').textContent          = brl(Math.max(0, diaLiq));
-  document.getElementById('c-saldo-quinzena').textContent     = brl(Math.max(0, liquidoQ));
-  document.getElementById('c-bruto').textContent              = brl(brutoQ);
+  const badgeEl = document.getElementById('colab-quinzena-badge');
+  badgeEl.textContent = q.label + (isAtual ? '' : '');
+
+  document.getElementById('c-saldo-dia').textContent      = diaLiq !== null ? brl(Math.max(0, diaLiq)) : '—';
+  document.getElementById('c-saldo-quinzena').textContent = brl(Math.max(0, liquidoQ));
+  document.getElementById('c-bruto').textContent          = brl(brutoNormal + brutoBronze);
+
+  // Seta "próximo" desabilitada se estiver na quinzena atual
+  document.querySelectorAll('.period-nav-btn').forEach((btn, i) => {
+    if (i === 1) btn.disabled = isAtual; // botão direito (→)
+  });
 
   renderMovs('colab-movs', qRec.slice().sort((a,b) => b.ts - a.ts), false);
   renderHistoricoQuinzenas('colab-hist-quinzenas', myRec);
@@ -457,7 +594,25 @@ function renderMovs(elId, list, showUser) {
 
 function movItemHtml(r, showUser) {
   const isGanho   = r.type === 'ganho';
-  const liq       = isGanho ? r.val * 0.7 : null;
+  const isBronze  = r.type === 'bronze';
+  const isVale    = r.type === 'vale';
+  const isDespesa = r.type === 'despesa';
+
+  let valorDisplay, tipoLabel;
+  if (isGanho) {
+    valorDisplay = '+' + brl(r.val);
+    tipoLabel    = 'líq: ' + brl(r.val * 0.7);
+  } else if (isBronze) {
+    valorDisplay = '+' + brl(r.val);
+    tipoLabel    = 'bronze · salão: ' + brl(r.bronze_salao || 0);
+  } else if (isDespesa) {
+    valorDisplay = '-' + brl(r.val);
+    tipoLabel    = 'despesa';
+  } else {
+    valorDisplay = '-' + brl(r.val);
+    tipoLabel    = 'vale';
+  }
+
   const userLabel = showUser && USERS[r.user] ? USERS[r.user].name + ' · ' : '';
   return `
     <div class="mov-item">
@@ -466,10 +621,8 @@ function movItemHtml(r, showUser) {
         <div class="mov-meta">${userLabel}${fmtFull(r.ts)}</div>
       </div>
       <div>
-        <div class="mov-val ${isGanho ? 'pos' : 'neg'}">
-          ${isGanho ? '+' : '-'}${brl(r.val)}
-        </div>
-        <div class="mov-type">${isGanho ? 'líq: ' + brl(liq) : 'vale'}</div>
+        <div class="mov-val ${(isGanho || isBronze) ? 'pos' : 'neg'}">${valorDisplay}</div>
+        <div class="mov-type">${tipoLabel}</div>
       </div>
     </div>`;
 }
@@ -492,8 +645,9 @@ function renderHistoricoQuinzenas(elId, allRecords) {
     const isAtual   = g.key === qAtual;
     const isOpen    = isAtual || idx === 0;
     const bruto     = g.items.filter(r => r.type === 'ganho').reduce((s, r) => s + r.val, 0);
+    const bronze    = g.items.filter(r => r.type === 'bronze').reduce((s, r) => s + r.val, 0);
     const vales     = g.items.filter(r => r.type === 'vale').reduce((s, r) => s + r.val, 0);
-    const liquido   = bruto * 0.7 - vales;
+    const liquido   = (bruto * 0.7) + bronze - vales;
     const itemsHtml = g.items.slice().sort((a,b) => b.ts - a.ts).map(r => movItemHtml(r, false)).join('');
 
     return `
@@ -510,7 +664,7 @@ function renderHistoricoQuinzenas(elId, allRecords) {
         </button>
         <div class="hist-group-body ${isOpen ? 'open' : ''}">
           <div class="hist-group-totals">
-            <span>Bruto: ${brl(bruto)}</span>
+            <span>Bruto: ${brl(bruto + bronze)}</span>
             <span>Vales: -${brl(vales)}</span>
             <span>Líquido: ${brl(Math.max(0, liquido))}</span>
           </div>
@@ -539,34 +693,48 @@ function renderDona() {
 }
 
 function renderDonaPainel() {
-  const q = getQuinzena(Date.now());
+  const mes    = getMesOffset(donaMesOffset);
+  const isAtual = donaMesOffset === 0;
 
-  const qRec     = records.filter(r => inQuinzena(r.ts, q));
-  const todayRec = records.filter(r => isToday(r.ts));
+  const mRec  = records.filter(r => inMes(r.ts, mes));
+  const despM = despesas.filter(d => inMes(d.ts, mes)).reduce((s, d) => s + d.val, 0);
 
-  const brutoQ    = qRec.filter(r => r.type === 'ganho').reduce((s, r) => s + r.val, 0);
-  const salaQ     = brutoQ * 0.3;
-  const brutoHoje = todayRec.filter(r => r.type === 'ganho').reduce((s, r) => s + r.val, 0);
-  const salaHoje  = brutoHoje * 0.3;
-  const despQ     = despesas.filter(d => inQuinzena(d.ts, q)).reduce((s, d) => s + d.val, 0);
+  // 30% dos ganhos normais do mês
+  const trinta_normal = mRec
+    .filter(r => r.type === 'ganho')
+    .reduce((s, r) => s + r.val, 0) * 0.3;
 
-  document.getElementById('dona-quinzena-badge').textContent = 'Quinzena: ' + q.label;
-  document.getElementById('d-30-dia').textContent            = brl(salaHoje);
-  document.getElementById('d-30-quin').textContent           = brl(salaQ);
-  document.getElementById('d-bruto-q').textContent           = brl(brutoQ);
-  document.getElementById('d-desp-q').textContent            = brl(despQ);
+  // Bronze: excedente vai direto para o salão
+  const trinta_bronze = mRec
+    .filter(r => r.type === 'bronze')
+    .reduce((s, r) => s + (r.bronze_salao || 0), 0);
 
-  const qMovs = [
-    ...qRec,
+  const salaM    = trinta_normal + trinta_bronze;
+  const liqSalao = salaM - despM;
+
+  const badgeEl = document.getElementById('dona-mes-badge');
+  badgeEl.textContent = mes.label;
+
+  document.getElementById('d-30-quin').textContent   = brl(salaM);
+  document.getElementById('d-desp-q').textContent    = brl(despM);
+  document.getElementById('d-liq-salao').textContent = brl(liqSalao);
+
+  // Desabilita botão → quando estiver no mês atual
+  const navBtns = document.querySelectorAll('#s-dona .period-nav-btn');
+  navBtns.forEach((btn, i) => { if (i === 1) btn.disabled = isAtual; });
+
+  // Movimentações do mês
+  const mMovs = [
+    ...mRec,
     ...despesas
-      .filter(d => inQuinzena(d.ts, q))
-      .map(d => ({ ...d, user: 'salao', type: 'despesa', desc: '📋 ' + d.desc, cliente: '' })),
+      .filter(d => inMes(d.ts, mes))
+      .map(d => ({ ...d, user: 'salao', type: 'despesa', desc: '📋 ' + d.desc, cliente: '', bronze_salao: 0 })),
   ].sort((a, b) => b.ts - a.ts);
 
   const el = document.getElementById('dona-movs');
-  el.innerHTML = qMovs.length
-    ? qMovs.map(r => movItemHtml(r, true)).join('')
-    : '<div class="empty-state">Nenhum registro nesta quinzena.</div>';
+  el.innerHTML = mMovs.length
+    ? mMovs.map(r => movItemHtml(r, true)).join('')
+    : '<div class="empty-state">Nenhum registro neste mês.</div>';
 }
 
 /* ══════════════════════════════════════════
@@ -579,10 +747,12 @@ function renderEquipe() {
   el.innerHTML = COLABS.map(key => {
     const u     = USERS[key];
     const myQ   = records.filter(r => r.user === key && inQuinzena(r.ts, q));
-    const bruto = myQ.filter(r => r.type === 'ganho').reduce((s, r) => s + r.val, 0);
-    const vales = myQ.filter(r => r.type === 'vale').reduce((s, r) => s + r.val, 0);
-    const sala  = bruto * 0.3;
-    const liq   = bruto * 0.7 - vales;
+
+    const brutoNormal = myQ.filter(r => r.type === 'ganho').reduce((s, r) => s + r.val, 0);
+    const brutoBronze = myQ.filter(r => r.type === 'bronze').reduce((s, r) => s + r.val, 0);
+    const vales       = myQ.filter(r => r.type === 'vale').reduce((s, r) => s + r.val, 0);
+    const sala        = brutoNormal * 0.3;
+    const liq         = (brutoNormal * 0.7) + brutoBronze - vales;
 
     const ultimos  = records.filter(r => r.user === key).slice(0, 5);
     const recsHtml = ultimos.map(r => `
@@ -592,8 +762,8 @@ function renderEquipe() {
           <div class="mov-meta">${fmtFull(r.ts)}</div>
         </div>
         <div style="text-align:right">
-          <div class="mov-val ${r.type === 'ganho' ? 'pos' : 'neg'}" style="font-size:12px">
-            ${r.type === 'ganho' ? '+' : '-'}${brl(r.val)}
+          <div class="mov-val ${r.type === 'vale' ? 'neg' : 'pos'}" style="font-size:12px">
+            ${r.type === 'vale' ? '-' : '+'}${brl(r.val)}
           </div>
           <button class="edit-btn" onclick="openEdit(${r.id})">editar</button>
         </div>
@@ -602,7 +772,7 @@ function renderEquipe() {
     return `
       <div class="colab-card">
         <div class="colab-name">${u.name}</div>
-        <div class="colab-row"><span>Bruto quinzena</span><span>${brl(bruto)}</span></div>
+        <div class="colab-row"><span>Bruto quinzena</span><span>${brl(brutoNormal + brutoBronze)}</span></div>
         <div class="colab-row"><span>30% salão</span><span>${brl(sala)}</span></div>
         <div class="colab-row"><span>Vales descontados</span><span>- ${brl(vales)}</span></div>
         <div class="colab-row">
@@ -631,7 +801,10 @@ function renderDespesas() {
         <div class="mov-desc">${d.desc}</div>
         <div class="mov-meta">${fmtFull(d.ts)}</div>
       </div>
-      <div class="mov-val neg">- ${brl(d.val)}</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="mov-val neg">- ${brl(d.val)}</div>
+        <button class="edit-btn" onclick="openEditDespesa(${d.id})">editar</button>
+      </div>
     </div>`).join('');
 }
 
@@ -667,65 +840,67 @@ async function addDespesa() {
    RENDER — ABA CAIXA
 ══════════════════════════════════════════ */
 function renderCaixa() {
-  const hoje30 = records
-    .filter(r => isToday(r.ts) && r.type === 'ganho' && !r.fechado)
-    .reduce((s, r) => s + r.val, 0) * 0.3;
-
-  const ant   = caixaFechamentos.reduce((s, f) => s + f.val, 0);
-  const total = hoje30 + ant;
-
-  document.getElementById('cx-hoje').textContent   = brl(hoje30);
-  document.getElementById('cx-ant').textContent    = brl(ant);
-  document.getElementById('caixa-val').textContent = brl(total);
-
-  const el = document.getElementById('cx-hist');
-  if (!caixaFechamentos.length) {
-    el.innerHTML = '<div class="empty-state">Nenhum fechamento ainda.</div>';
-    return;
-  }
-  el.innerHTML = caixaFechamentos.map(f => `
-    <div class="mov-item">
-      <div>
-        <div class="mov-desc">Fechamento do caixa</div>
-        <div class="mov-meta">${fmtFull(f.ts)}</div>
-      </div>
-      <div class="mov-val pos">+ ${brl(f.val)}</div>
-    </div>`).join('');
+  renderHistoricoMensal();
 }
 
-async function fecharCaixa() {
-  const paraFechar = records.filter(r => isToday(r.ts) && r.type === 'ganho' && !r.fechado);
-  const msg = document.getElementById('cx-msg');
+function renderHistoricoMensal() {
+  const el     = document.getElementById('cx-hist-mensal');
+  const grupos = agruparPorMes(records, despesas);
 
-  if (!paraFechar.length) {
-    msg.textContent = 'Sem ganhos novos hoje para fechar.';
-    setTimeout(() => msg.textContent = '', 2500);
+  if (!grupos.length) {
+    el.innerHTML = '<div class="empty-state">Nenhum dado ainda.</div>';
     return;
   }
 
-  const valor30 = paraFechar.reduce((s, r) => s + r.val, 0) * 0.3;
+  const mesAtualKey = (() => {
+    const n = new Date();
+    return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`;
+  })();
 
-  showLoading(true);
-  try {
-    // Marca registros como fechados no Supabase
-    await Promise.all(paraFechar.map(r => {
-      r.fechado = true;
-      return updateRecord(r);
-    }));
+  el.innerHTML = grupos.map((g, idx) => {
+    const isAtual = g.key === mesAtualKey;
+    const isOpen  = isAtual || idx === 0;
 
-    const novoFech = await insertFechamento(valor30);
-    caixaFechamentos.unshift(novoFech);
+    const trinta_normal = g.records
+      .filter(r => r.type === 'ganho')
+      .reduce((s, r) => s + r.val, 0) * 0.3;
+    const trinta_bronze = g.records
+      .filter(r => r.type === 'bronze')
+      .reduce((s, r) => s + (r.bronze_salao || 0), 0);
+    const sala30  = trinta_normal + trinta_bronze;
+    const despTot = g.despesas.reduce((s, d) => s + d.val, 0);
+    const liq     = sala30 - despTot;
 
-    msg.textContent = `Caixa fechado! ${brl(valor30)} adicionado ao saldo.`;
-    setTimeout(() => msg.textContent = '', 3000);
-
-    renderCaixa();
-  } catch (err) {
-    console.error('Erro ao fechar caixa:', err);
-    alert('Erro ao fechar caixa. Tente novamente.');
-  } finally {
-    showLoading(false);
-  }
+    return `
+      <div class="hist-group">
+        <button class="hist-group-header ${isOpen ? 'open' : ''}" onclick="toggleHistGroup(this)">
+          <div class="hist-group-label">
+            <span class="hist-group-period">${g.label}</span>
+            ${isAtual ? '<span class="hist-badge-atual">atual</span>' : ''}
+          </div>
+          <div class="hist-group-summary">
+            <span class="hist-group-liq" style="color:${liq >= 0 ? 'var(--success)' : 'var(--danger)'}">${brl(liq)}</span>
+            <span class="hist-group-arrow">${isOpen ? '▲' : '▼'}</span>
+          </div>
+        </button>
+        <div class="hist-group-body ${isOpen ? 'open' : ''}">
+          <div class="hist-group-totals hist-group-totals-mensal">
+            <div class="hist-mensal-row">
+              <span class="hist-mensal-label">30% salão</span>
+              <span class="hist-mensal-val pos">${brl(sala30)}</span>
+            </div>
+            <div class="hist-mensal-row">
+              <span class="hist-mensal-label">Despesas</span>
+              <span class="hist-mensal-val neg">- ${brl(despTot)}</span>
+            </div>
+            <div class="hist-mensal-row hist-mensal-total">
+              <span class="hist-mensal-label">Total líquido</span>
+              <span class="hist-mensal-val" style="color:${liq >= 0 ? 'var(--success)' : 'var(--danger)'}">${brl(liq)}</span>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
 }
 
 /* ══════════════════════════════════════════
@@ -735,7 +910,7 @@ function openEdit(id) {
   const r = records.find(x => x.id === id);
   if (!r) return;
   editingId = id;
-  document.getElementById('modal-title').textContent = 'Editar — ' + (r.type === 'ganho' ? 'Ganho' : 'Vale');
+  document.getElementById('modal-title').textContent = 'Editar — ' + (r.type === 'ganho' ? 'Ganho' : r.type === 'bronze' ? 'Bronze' : 'Vale');
   document.getElementById('m-desc').value = r.cliente || r.desc;
   document.getElementById('m-val').value  = r.val;
   document.getElementById('m-data').value = tsToDateInput(r.ts);
@@ -774,6 +949,52 @@ async function saveEdit() {
   } catch (err) {
     console.error('Erro ao editar:', err);
     alert('Erro ao salvar edição. Tente novamente.');
+  } finally {
+    showLoading(false);
+  }
+}
+
+/* ══════════════════════════════════════════
+   MODAL DE EDIÇÃO DE DESPESA (proprietária)
+══════════════════════════════════════════ */
+function openEditDespesa(id) {
+  const d = despesas.find(x => x.id === id);
+  if (!d) return;
+  editingDespesaId = id;
+  document.getElementById('md-desc').value = d.desc;
+  document.getElementById('md-val').value  = d.val;
+  document.getElementById('md-data').value = tsToDateInput(d.ts);
+  document.getElementById('modal-despesa').classList.add('open');
+}
+
+function closeModalDespesa() {
+  document.getElementById('modal-despesa').classList.remove('open');
+  editingDespesaId = null;
+}
+
+async function saveEditDespesa() {
+  const d      = despesas.find(x => x.id === editingDespesaId);
+  if (!d) return;
+  const newVal  = parseFloat(document.getElementById('md-val').value);
+  const newDesc = document.getElementById('md-desc').value.trim();
+  const newData = document.getElementById('md-data').value;
+  if (!newDesc || isNaN(newVal) || newVal <= 0) { alert('Preencha todos os campos.'); return; }
+  if (!newData) { alert('Informe a data.'); return; }
+
+  d.desc = newDesc;
+  d.val  = newVal;
+  d.ts   = dateInputToTs(newData);
+
+  showLoading(true);
+  try {
+    await updateDespesa(d);
+    closeModalDespesa();
+    renderDespesas();
+    renderDonaPainel();
+    renderCaixa();
+  } catch (err) {
+    console.error('Erro ao editar despesa:', err);
+    alert('Erro ao salvar. Tente novamente.');
   } finally {
     showLoading(false);
   }

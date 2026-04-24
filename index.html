@@ -8,6 +8,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="theme-color" content="#ffffff" />
   <title>Ateliê Tati Brandão</title>
+  <link rel="icon" type="image/jpeg" href="src/favicon.jpeg" />
+  <link rel="apple-touch-icon" href="src/favicon.jpeg" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -68,7 +70,11 @@
 
       <!-- INÍCIO -->
       <div class="tab-content active" id="colab-inicio">
-        <div class="quinzena-badge" id="colab-quinzena-badge"></div>
+        <div class="period-nav">
+          <button class="period-nav-btn" onclick="colabNavQuinzena(-1)">&#8592;</button>
+          <div class="quinzena-badge" id="colab-quinzena-badge"></div>
+          <button class="period-nav-btn" onclick="colabNavQuinzena(1)">&#8594;</button>
+        </div>
         <div class="cards-row">
           <div class="card">
             <div class="card-label">Saldo líquido hoje</div>
@@ -92,8 +98,9 @@
       <!-- REGISTRAR -->
       <div class="tab-content" id="colab-registrar">
         <div class="toggle-row">
-          <button class="toggle-btn active" id="tog-ganho" onclick="setTipo('ganho')">Ganho</button>
-          <button class="toggle-btn" id="tog-vale" onclick="setTipo('vale')">Vale</button>
+          <button class="toggle-btn active" id="tog-ganho"  onclick="setTipo('ganho')">Ganho</button>
+          <button class="toggle-btn"        id="tog-vale"   onclick="setTipo('vale')">Vale</button>
+          <button class="toggle-btn"        id="tog-bronze" onclick="setTipo('bronze')">Bronze</button>
         </div>
         <div class="form-group">
           <label>Data do registro</label>
@@ -117,6 +124,23 @@
           <div class="form-group">
             <label>Valor (R$)</label>
             <input type="number" id="r-valor-v" placeholder="0,00" min="0" step="0.01" inputmode="decimal" />
+          </div>
+        </div>
+        <div id="form-bronze" style="display:none">
+          <div class="bronze-info">
+            R$ 10,00 vão para você · o excedente vai para o salão
+          </div>
+          <div class="form-group">
+            <label>Nome da cliente</label>
+            <input type="text" id="r-cliente-b" placeholder="Ex: Maria Silva" autocomplete="off" />
+          </div>
+          <div class="form-group">
+            <label>Valor total do atendimento (R$)</label>
+            <input type="number" id="r-valor-b" placeholder="Ex: 40,00" min="10.01" step="0.01" inputmode="decimal" oninput="previewBronze()" />
+          </div>
+          <div class="bronze-preview" id="bronze-preview" style="display:none">
+            <span>Você recebe: <strong id="bp-colab">R$ 10,00</strong></span>
+            <span>Salão recebe: <strong id="bp-salao">—</strong></span>
           </div>
         </div>
         <button class="submit-btn" onclick="registrar()">Registrar</button>
@@ -147,29 +171,29 @@
       <button class="nav-btn active" onclick="switchTab('dona','painel')">Painel</button>
       <button class="nav-btn" onclick="switchTab('dona','equipe')">Equipe</button>
       <button class="nav-btn" onclick="switchTab('dona','despesas')">Despesas</button>
-      <button class="nav-btn" onclick="switchTab('dona','caixa')">Caixa</button>
+      <button class="nav-btn" onclick="switchTab('dona','caixa')">Histórico</button>
     </div>
     <div class="content">
 
       <!-- PAINEL -->
       <div class="tab-content active" id="dona-painel">
-        <div class="quinzena-badge" id="dona-quinzena-badge"></div>
+        <div class="period-nav">
+          <button class="period-nav-btn" onclick="donaNavMes(-1)">&#8592;</button>
+          <div class="quinzena-badge" id="dona-mes-badge"></div>
+          <button class="period-nav-btn" onclick="donaNavMes(1)">&#8594;</button>
+        </div>
         <div class="cards-row">
-          <div class="card">
-            <div class="card-label">30% salão (hoje)</div>
-            <div class="card-val rose" id="d-30-dia">R$ 0,00</div>
-          </div>
           <div class="card">
             <div class="card-label">30% salão (quinzena)</div>
             <div class="card-val rose" id="d-30-quin">R$ 0,00</div>
           </div>
           <div class="card">
-            <div class="card-label">Total bruto equipe</div>
-            <div class="card-val" id="d-bruto-q">R$ 0,00</div>
-          </div>
-          <div class="card">
             <div class="card-label">Despesas (quinzena)</div>
             <div class="card-val" id="d-desp-q">R$ 0,00</div>
+          </div>
+          <div class="card card-full">
+            <div class="card-label">Total líquido salão</div>
+            <div class="card-val green" id="d-liq-salao">R$ 0,00</div>
           </div>
         </div>
         <div class="section-head">Movimentações desta quinzena</div>
@@ -203,26 +227,8 @@
 
       <!-- CAIXA -->
       <div class="tab-content" id="dona-caixa">
-        <div class="caixa-card">
-          <div class="caixa-label">Saldo em caixa</div>
-          <div class="caixa-val" id="caixa-val">R$ 0,00</div>
-        </div>
-        <div class="cards-row">
-          <div class="card">
-            <div class="card-label">Entrou hoje (30%)</div>
-            <div class="card-val" id="cx-hoje">R$ 0,00</div>
-          </div>
-          <div class="card">
-            <div class="card-label">Fechamentos anteriores</div>
-            <div class="card-val" id="cx-ant">R$ 0,00</div>
-          </div>
-        </div>
-        <button class="fechar-btn" onclick="fecharCaixa()">Fechar caixa do dia</button>
-        <div class="success-msg" id="cx-msg"></div>
-        <div class="section-head" style="margin-top: 1rem">Histórico de fechamentos</div>
-        <div class="card" style="padding: 0 14px">
-          <div id="cx-hist"></div>
-        </div>
+        <div class="section-head">Histórico por mês</div>
+        <div id="cx-hist-mensal"></div>
       </div>
 
     </div>
@@ -249,6 +255,31 @@
       <div class="modal-actions">
         <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
         <button class="btn-save" onclick="saveEdit()">Salvar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════
+       MODAL: EDIÇÃO DE DESPESA (proprietária)
+  ══════════════════════════════════ -->
+  <div class="modal-bg" id="modal-despesa">
+    <div class="modal">
+      <div class="modal-title">Editar despesa</div>
+      <div class="form-group">
+        <label>Descrição</label>
+        <input type="text" id="md-desc" autocomplete="off" />
+      </div>
+      <div class="form-group">
+        <label>Valor (R$)</label>
+        <input type="number" id="md-val" step="0.01" inputmode="decimal" />
+      </div>
+      <div class="form-group">
+        <label>Data</label>
+        <input type="date" id="md-data" />
+      </div>
+      <div class="modal-actions">
+        <button class="btn-cancel" onclick="closeModalDespesa()">Cancelar</button>
+        <button class="btn-save" onclick="saveEditDespesa()">Salvar</button>
       </div>
     </div>
   </div>
