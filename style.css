@@ -512,12 +512,15 @@ body {
 ══════════════════════════════════════════ */
 .modal-bg {
   display: none;
-  position: absolute;
+  position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, .35);
-  z-index: 100;
-  align-items: center;
+  background: rgba(0, 0, 0, .4);
+  z-index: 200;
+  align-items: flex-start;
   justify-content: center;
+  padding-top: 20px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 .modal-bg.open {
   display: flex;
@@ -528,7 +531,8 @@ body {
   border-radius: 16px;
   padding: 1.25rem;
   width: 90%;
-  max-width: 320px;
+  max-width: 340px;
+  margin-bottom: 20px; /* espaço no final em telas pequenas */
 }
 
 .modal-title {
@@ -536,6 +540,15 @@ body {
   font-weight: 500;
   color: var(--text);
   margin-bottom: 1rem;
+}
+
+.modal-section-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin-bottom: 6px;
 }
 
 .modal-actions {

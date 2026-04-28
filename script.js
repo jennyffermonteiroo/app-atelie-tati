@@ -30,8 +30,9 @@ let editingId        = null;
 let editingDespesaId = null;
 
 // Offset de navegação: 0 = período atual, -1 = anterior, etc.
-let colabQuinzenaOffset = 0;
-let donaMesOffset       = 0;
+let colabQuinzenaOffset  = 0;
+let equipeQuinzenaOffset = 0;
+let donaMesOffset        = 0;
 
 /* ══════════════════════════════════════════
    ESTADO (cache local — carregado do Supabase)
@@ -216,9 +217,14 @@ function agruparPorMes(recList, despList) {
 
 function colabNavQuinzena(dir) {
   colabQuinzenaOffset += dir;
-  // Não permite avançar além do período atual
   if (colabQuinzenaOffset > 0) colabQuinzenaOffset = 0;
   renderColab();
+}
+
+function equipeNavQuinzena(dir) {
+  equipeQuinzenaOffset += dir;
+  if (equipeQuinzenaOffset > 0) equipeQuinzenaOffset = 0;
+  renderEquipe();
 }
 
 function donaNavMes(dir) {
@@ -383,8 +389,9 @@ async function doLogin() {
 function logout() {
   currentUser = null;
   records = []; despesas = []; caixaFechamentos = [];
-  colabQuinzenaOffset = 0;
-  donaMesOffset       = 0;
+  colabQuinzenaOffset  = 0;
+  equipeQuinzenaOffset = 0;
+  donaMesOffset        = 0;
   showScreen('s-login');
   document.getElementById('login-pass').value = '';
   document.getElementById('login-user').value = '';
@@ -628,6 +635,49 @@ function movItemHtml(r, showUser) {
 }
 
 /* ══════════════════════════════════════════
+   RENDER — MOVIMENTAÇÕES COM EDITAR (dona painel)
+══════════════════════════════════════════ */
+function movItemHtmlDona(r) {
+  const isGanho   = r.type === 'ganho';
+  const isBronze  = r.type === 'bronze';
+  const isDespesa = r.type === 'despesa';
+
+  let valorDisplay, tipoLabel;
+  if (isGanho) {
+    valorDisplay = '+' + brl(r.val);
+    tipoLabel    = 'líq: ' + brl(r.val * 0.7);
+  } else if (isBronze) {
+    valorDisplay = '+' + brl(r.val);
+    tipoLabel    = 'bronze · salão: ' + brl(r.bronze_salao || 0);
+  } else if (isDespesa) {
+    valorDisplay = '-' + brl(r.val);
+    tipoLabel    = 'despesa';
+  } else {
+    valorDisplay = '-' + brl(r.val);
+    tipoLabel    = 'vale';
+  }
+
+  const userName  = USERS[r.user] ? USERS[r.user].name + ' · ' : '';
+  const canEdit   = !isDespesa; // despesas têm edição própria na aba Despesas
+  const editBtn   = canEdit
+    ? `<button class="edit-btn" onclick="openEdit(${r.id})" style="margin-top:4px">editar</button>`
+    : '';
+
+  return `
+    <div class="mov-item">
+      <div>
+        <div class="mov-desc">${r.desc}</div>
+        <div class="mov-meta">${userName}${fmtFull(r.ts)}</div>
+        ${editBtn}
+      </div>
+      <div style="text-align:right">
+        <div class="mov-val ${(isGanho || isBronze) ? 'pos' : 'neg'}">${valorDisplay}</div>
+        <div class="mov-type">${tipoLabel}</div>
+      </div>
+    </div>`;
+}
+
+/* ══════════════════════════════════════════
    RENDER — HISTÓRICO POR QUINZENA (accordion)
 ══════════════════════════════════════════ */
 function renderHistoricoQuinzenas(elId, allRecords) {
@@ -723,7 +773,7 @@ function renderDonaPainel() {
   const navBtns = document.querySelectorAll('#s-dona .period-nav-btn');
   navBtns.forEach((btn, i) => { if (i === 1) btn.disabled = isAtual; });
 
-  // Movimentações do mês
+  // Movimentações do mês com botão editar nos records (não despesas)
   const mMovs = [
     ...mRec,
     ...despesas
@@ -733,7 +783,7 @@ function renderDonaPainel() {
 
   const el = document.getElementById('dona-movs');
   el.innerHTML = mMovs.length
-    ? mMovs.map(r => movItemHtml(r, true)).join('')
+    ? mMovs.map(r => movItemHtmlDona(r)).join('')
     : '<div class="empty-state">Nenhum registro neste mês.</div>';
 }
 
@@ -741,7 +791,27 @@ function renderDonaPainel() {
    RENDER — ABA EQUIPE
 ══════════════════════════════════════════ */
 function renderEquipe() {
-  const q  = getQuinzena(Date.now());
+  // Calcula quinzena com base no offset do navegador da aba Equipe
+  const refTs = (() => {
+    if (equipeQuinzenaOffset === 0) return Date.now();
+    let ts = Date.now();
+    for (let i = 0; i < Math.abs(equipeQuinzenaOffset); i++) {
+      const q = getQuinzena(ts);
+      ts = q.s.getTime() - 1;
+    }
+    return ts;
+  })();
+
+  const q       = getQuinzena(refTs);
+  const isAtual = equipeQuinzenaOffset === 0;
+
+  // Atualiza badge e botões do navegador
+  const badgeEl = document.getElementById('equipe-quinzena-badge');
+  if (badgeEl) badgeEl.textContent = q.label;
+
+  const navBtns = document.querySelectorAll('#dona-equipe .period-nav-btn');
+  navBtns.forEach((btn, i) => { if (i === 1) btn.disabled = isAtual; });
+
   const el = document.getElementById('dona-equipe-list');
 
   el.innerHTML = COLABS.map(key => {
@@ -754,21 +824,6 @@ function renderEquipe() {
     const sala        = brutoNormal * 0.3;
     const liq         = (brutoNormal * 0.7) + brutoBronze - vales;
 
-    const ultimos  = records.filter(r => r.user === key).slice(0, 5);
-    const recsHtml = ultimos.map(r => `
-      <div class="mov-item">
-        <div>
-          <div class="mov-desc" style="font-size:12px">${r.desc}</div>
-          <div class="mov-meta">${fmtFull(r.ts)}</div>
-        </div>
-        <div style="text-align:right">
-          <div class="mov-val ${r.type === 'vale' ? 'neg' : 'pos'}" style="font-size:12px">
-            ${r.type === 'vale' ? '-' : '+'}${brl(r.val)}
-          </div>
-          <button class="edit-btn" onclick="openEdit(${r.id})">editar</button>
-        </div>
-      </div>`).join('') || '<div class="empty-state" style="padding:8px">Sem registros</div>';
-
     return `
       <div class="colab-card">
         <div class="colab-name">${u.name}</div>
@@ -779,9 +834,6 @@ function renderEquipe() {
           <span style="font-weight:500;color:var(--text)">A receber</span>
           <span style="color:var(--success);font-size:14px">${brl(Math.max(0, liq))}</span>
         </div>
-        <div style="margin-top:10px;border-top:0.5px solid var(--border);padding-top:8px">
-          ${recsHtml}
-        </div>
       </div>`;
   }).join('');
 }
@@ -791,21 +843,70 @@ function renderEquipe() {
 ══════════════════════════════════════════ */
 function renderDespesas() {
   const el = document.getElementById('dona-desp-list');
+
   if (!despesas.length) {
     el.innerHTML = '<div class="empty-state">Nenhuma despesa registrada.</div>';
     return;
   }
-  el.innerHTML = despesas.map(d => `
-    <div class="mov-item">
-      <div>
-        <div class="mov-desc">${d.desc}</div>
-        <div class="mov-meta">${fmtFull(d.ts)}</div>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px">
-        <div class="mov-val neg">- ${brl(d.val)}</div>
-        <button class="edit-btn" onclick="openEditDespesa(${d.id})">editar</button>
-      </div>
-    </div>`).join('');
+
+  // Agrupa despesas por mês
+  const map = new Map();
+  despesas.forEach(d => {
+    const dt  = new Date(d.ts);
+    const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
+    if (!map.has(key)) {
+      const label = dt.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+      map.set(key, {
+        key,
+        label: label.charAt(0).toUpperCase() + label.slice(1),
+        s: new Date(dt.getFullYear(), dt.getMonth(), 1),
+        items: [],
+      });
+    }
+    map.get(key).items.push(d);
+  });
+
+  const grupos = Array.from(map.values()).sort((a, b) => b.s - a.s);
+
+  const mesAtualKey = (() => {
+    const n = new Date();
+    return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`;
+  })();
+
+  el.innerHTML = grupos.map((g, idx) => {
+    const isAtual = g.key === mesAtualKey;
+    const isOpen  = isAtual || idx === 0;
+    const total   = g.items.reduce((s, d) => s + d.val, 0);
+
+    const itemsHtml = g.items.map(d => `
+      <div class="mov-item">
+        <div>
+          <div class="mov-desc">${d.desc}</div>
+          <div class="mov-meta">${fmtFull(d.ts)}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;justify-content:flex-end">
+          <div class="mov-val neg">- ${brl(d.val)}</div>
+          <button class="edit-btn" onclick="openEditDespesa(${d.id})">editar</button>
+        </div>
+      </div>`).join('');
+
+    return `
+      <div class="hist-group">
+        <button class="hist-group-header ${isOpen ? 'open' : ''}" onclick="toggleHistGroup(this)">
+          <div class="hist-group-label">
+            <span class="hist-group-period">${g.label}</span>
+            ${isAtual ? '<span class="hist-badge-atual">atual</span>' : ''}
+          </div>
+          <div class="hist-group-summary">
+            <span class="hist-group-liq" style="color:var(--danger)">- ${brl(total)}</span>
+            <span class="hist-group-arrow">${isOpen ? '▲' : '▼'}</span>
+          </div>
+        </button>
+        <div class="hist-group-body ${isOpen ? 'open' : ''}">
+          <div style="padding: 0 14px">${itemsHtml}</div>
+        </div>
+      </div>`;
+  }).join('');
 }
 
 async function addDespesa() {
@@ -910,11 +1011,43 @@ function openEdit(id) {
   const r = records.find(x => x.id === id);
   if (!r) return;
   editingId = id;
-  document.getElementById('modal-title').textContent = 'Editar — ' + (r.type === 'ganho' ? 'Ganho' : r.type === 'bronze' ? 'Bronze' : 'Vale');
+
+  const isBronze = r.type === 'bronze';
+
+  document.getElementById('modal-title').textContent =
+    r.type === 'ganho' ? 'Editar — Ganho' :
+    r.type === 'bronze' ? 'Editar — Bronze' : 'Editar — Vale';
+
   document.getElementById('m-desc').value = r.cliente || r.desc;
-  document.getElementById('m-val').value  = r.val;
   document.getElementById('m-data').value = tsToDateInput(r.ts);
+
+  // Alterna campos conforme tipo
+  document.getElementById('m-val-group').style.display        = isBronze ? 'none' : 'block';
+  document.getElementById('m-val-bronze-group').style.display = isBronze ? 'block' : 'none';
+
+  if (isBronze) {
+    // Mostra o valor TOTAL (colaboradora R$10 + salão)
+    const total = r.val + (r.bronze_salao || 0);
+    document.getElementById('m-val-bronze').value = total;
+    previewEditBronze();
+  } else {
+    document.getElementById('m-val').value = r.val;
+    document.getElementById('m-bronze-preview').style.display = 'none';
+  }
+
   document.getElementById('modal-edit').classList.add('open');
+}
+
+function previewEditBronze() {
+  const total = parseFloat(document.getElementById('m-val-bronze').value);
+  const prev  = document.getElementById('m-bronze-preview');
+  if (!isNaN(total) && total > 10) {
+    prev.style.display = 'flex';
+    document.getElementById('m-bp-colab').textContent = brl(10);
+    document.getElementById('m-bp-salao').textContent = brl(total - 10);
+  } else {
+    prev.style.display = 'none';
+  }
 }
 
 function closeModal() {
@@ -923,22 +1056,38 @@ function closeModal() {
 }
 
 async function saveEdit() {
-  const r      = records.find(x => x.id === editingId);
+  const r       = records.find(x => x.id === editingId);
   if (!r) return;
-  const newVal  = parseFloat(document.getElementById('m-val').value);
-  const newDesc = document.getElementById('m-desc').value.trim();
-  const newData = document.getElementById('m-data').value;
-  if (!newDesc || isNaN(newVal) || newVal <= 0) { alert('Preencha todos os campos.'); return; }
-  if (!newData) { alert('Informe a data do registro.'); return; }
+  const isBronze = r.type === 'bronze';
+  const newDesc  = document.getElementById('m-desc').value.trim();
+  const newData  = document.getElementById('m-data').value;
+  if (!newDesc) { alert('Preencha a descrição.'); return; }
+  if (!newData)  { alert('Informe a data do registro.'); return; }
 
-  if (r.type === 'ganho') {
-    r.cliente = newDesc;
-    r.desc    = 'Atendimento — ' + newDesc;
+  if (isBronze) {
+    // Para bronze: lê o valor TOTAL e recalcula a divisão
+    const total = parseFloat(document.getElementById('m-val-bronze').value);
+    if (isNaN(total) || total <= 10) {
+      alert('O valor total do bronze deve ser maior que R$ 10,00.');
+      return;
+    }
+    r.val          = 10;          // colaboradora sempre R$10
+    r.bronze_salao = total - 10;  // excedente para o salão
+    r.cliente      = newDesc;
+    r.desc         = 'Bronze — ' + newDesc;
   } else {
-    r.desc = newDesc;
+    const newVal = parseFloat(document.getElementById('m-val').value);
+    if (isNaN(newVal) || newVal <= 0) { alert('Informe um valor válido.'); return; }
+    r.val = newVal;
+    if (r.type === 'ganho') {
+      r.cliente = newDesc;
+      r.desc    = 'Atendimento — ' + newDesc;
+    } else {
+      r.desc = newDesc;
+    }
   }
-  r.val = newVal;
-  r.ts  = dateInputToTs(newData);
+
+  r.ts = dateInputToTs(newData);
 
   showLoading(true);
   try {
@@ -946,6 +1095,7 @@ async function saveEdit() {
     closeModal();
     renderEquipe();
     renderDonaPainel();
+    renderCaixa();
   } catch (err) {
     console.error('Erro ao editar:', err);
     alert('Erro ao salvar edição. Tente novamente.');
