@@ -28,6 +28,8 @@ const COLABS = ['fabiola', 'kaylane', 'tati'];
 let currentUser      = null;
 let editingId        = null;
 let editingDespesaId = null;
+let deletingId       = null;   // ID do record a excluir
+let deletingType     = null;   // 'record' ou 'despesa'
 
 // Offset de navegação: 0 = período atual, -1 = anterior, etc.
 let colabQuinzenaOffset  = 0;
@@ -357,6 +359,16 @@ async function updateDespesa(obj) {
   if (error) throw error;
 }
 
+async function deleteRecord(id) {
+  const { error } = await db.from('records').delete().eq('id', id);
+  if (error) throw error;
+}
+
+async function deleteDespesa(id) {
+  const { error } = await db.from('despesas').delete().eq('id', id);
+  if (error) throw error;
+}
+
 /* ══════════════════════════════════════════
    AUTH
 ══════════════════════════════════════════ */
@@ -657,10 +669,14 @@ function movItemHtmlDona(r) {
     tipoLabel    = 'vale';
   }
 
-  const userName  = USERS[r.user] ? USERS[r.user].name + ' · ' : '';
-  const canEdit   = !isDespesa; // despesas têm edição própria na aba Despesas
-  const editBtn   = canEdit
-    ? `<button class="edit-btn" onclick="openEdit(${r.id})" style="margin-top:4px">editar</button>`
+  const userName = USERS[r.user] ? USERS[r.user].name + ' · ' : '';
+  const canEdit  = !isDespesa;
+
+  const btns = canEdit
+    ? `<div class="mov-action-btns">
+        <button class="edit-btn" onclick="openEdit(${r.id})">editar</button>
+        <button class="delete-btn" onclick="confirmDeleteRecord(${r.id}, '${r.desc.replace(/'/g, "\\'")}')">excluir</button>
+       </div>`
     : '';
 
   return `
@@ -668,7 +684,7 @@ function movItemHtmlDona(r) {
       <div>
         <div class="mov-desc">${r.desc}</div>
         <div class="mov-meta">${userName}${fmtFull(r.ts)}</div>
-        ${editBtn}
+        ${btns}
       </div>
       <div style="text-align:right">
         <div class="mov-val ${(isGanho || isBronze) ? 'pos' : 'neg'}">${valorDisplay}</div>
@@ -883,10 +899,13 @@ function renderDespesas() {
         <div>
           <div class="mov-desc">${d.desc}</div>
           <div class="mov-meta">${fmtFull(d.ts)}</div>
+          <div class="mov-action-btns">
+            <button class="edit-btn" onclick="openEditDespesa(${d.id})">editar</button>
+            <button class="delete-btn" onclick="confirmDeleteDespesa(${d.id}, '${d.desc.replace(/'/g, "\\'")}')">excluir</button>
+          </div>
         </div>
-        <div style="display:flex;align-items:center;gap:8px;justify-content:flex-end">
+        <div style="text-align:right">
           <div class="mov-val neg">- ${brl(d.val)}</div>
-          <button class="edit-btn" onclick="openEditDespesa(${d.id})">editar</button>
         </div>
       </div>`).join('');
 
@@ -1002,6 +1021,56 @@ function renderHistoricoMensal() {
         </div>
       </div>`;
   }).join('');
+}
+
+/* ══════════════════════════════════════════
+   EXCLUSÃO COM CONFIRMAÇÃO
+══════════════════════════════════════════ */
+
+function confirmDeleteRecord(id, desc) {
+  deletingId   = id;
+  deletingType = 'record';
+  document.getElementById('confirm-delete-desc').textContent = `"${desc}"`;
+  document.getElementById('modal-confirm-delete').classList.add('open');
+}
+
+function confirmDeleteDespesa(id, desc) {
+  deletingId   = id;
+  deletingType = 'despesa';
+  document.getElementById('confirm-delete-desc').textContent = `"${desc}"`;
+  document.getElementById('modal-confirm-delete').classList.add('open');
+}
+
+function closeConfirmDelete() {
+  document.getElementById('modal-confirm-delete').classList.remove('open');
+  deletingId   = null;
+  deletingType = null;
+}
+
+async function executeDelete() {
+  if (!deletingId || !deletingType) return;
+  closeConfirmDelete();
+  showLoading(true);
+  try {
+    if (deletingType === 'record') {
+      await deleteRecord(deletingId);
+      records = records.filter(r => r.id !== deletingId);
+      renderDonaPainel();
+      renderEquipe();
+      renderCaixa();
+    } else {
+      await deleteDespesa(deletingId);
+      despesas = despesas.filter(d => d.id !== deletingId);
+      renderDespesas();
+      renderDonaPainel();
+      renderCaixa();
+    }
+  } catch (err) {
+    console.error('Erro ao excluir:', err);
+    alert('Erro ao excluir. Tente novamente.');
+  } finally {
+    showLoading(false);
+  }
 }
 
 /* ══════════════════════════════════════════

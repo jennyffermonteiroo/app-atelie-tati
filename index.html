@@ -300,6 +300,21 @@
     </div>
   </div>
 
+  <!-- ══════════════════════════════════
+       MODAL: CONFIRMAÇÃO DE EXCLUSÃO
+  ══════════════════════════════════ -->
+  <div class="modal-bg" id="modal-confirm-delete">
+    <div class="modal modal-confirm">
+      <div class="modal-confirm-icon">🗑</div>
+      <div class="modal-confirm-title">Excluir registro?</div>
+      <div class="modal-confirm-desc" id="confirm-delete-desc">Esta ação não pode ser desfeita.</div>
+      <div class="modal-confirm-actions">
+        <button class="btn-confirm-cancel" onclick="closeConfirmDelete()">Cancelar</button>
+        <button class="btn-confirm-ok" onclick="executeDelete()">Sim, excluir</button>
+      </div>
+    </div>
+  </div>
+
 </div><!-- #app -->
 
 <!-- Supabase CDN -->

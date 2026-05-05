@@ -920,3 +920,91 @@ html, body {
 .hist-mensal-total .hist-mensal-val {
   font-size: 14px;
 }
+
+/* ══════════════════════════════════════════
+   BOTÕES DE AÇÃO (editar + excluir)
+══════════════════════════════════════════ */
+.mov-action-btns {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.delete-btn {
+  font-size: 11px;
+  padding: 3px 10px;
+  border: 0.5px solid #f5c6c6;
+  border-radius: 6px;
+  background: none;
+  color: var(--danger);
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+}
+.delete-btn:hover {
+  background: #fdf0f0;
+}
+
+/* ══════════════════════════════════════════
+   MODAL DE CONFIRMAÇÃO DE EXCLUSÃO
+══════════════════════════════════════════ */
+.modal-confirm {
+  text-align: center;
+  padding: 1.75rem 1.25rem 1.25rem;
+}
+
+.modal-confirm-icon {
+  font-size: 28px;
+  margin-bottom: 10px;
+}
+
+.modal-confirm-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.modal-confirm-desc {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 1.25rem;
+  word-break: break-word;
+}
+
+.modal-confirm-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.btn-confirm-cancel {
+  flex: 1;
+  padding: 11px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  background: none;
+  border: 0.5px solid var(--danger);
+  color: var(--danger);
+}
+.btn-confirm-cancel:hover {
+  background: #fdf0f0;
+}
+
+.btn-confirm-ok {
+  flex: 1;
+  padding: 11px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  background: var(--success);
+  border: none;
+  color: #fff;
+}
+.btn-confirm-ok:hover {
+  opacity: .9;
+}
