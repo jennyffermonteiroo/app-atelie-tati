@@ -360,12 +360,18 @@ async function updateDespesa(obj) {
 }
 
 async function deleteRecord(id) {
-  const { error } = await db.from('records').delete().eq('id', id);
+  const numId = Number(id);
+  console.log('[DELETE RECORD] id recebido:', id, '| convertido:', numId, '| tipo:', typeof numId);
+  const { data, error, status, statusText } = await db.from('records').delete().eq('id', numId).select();
+  console.log('[DELETE RECORD] status:', status, statusText, '| data:', data, '| error:', error);
   if (error) throw error;
 }
 
 async function deleteDespesa(id) {
-  const { error } = await db.from('despesas').delete().eq('id', id);
+  const numId = Number(id);
+  console.log('[DELETE DESPESA] id recebido:', id, '| convertido:', numId, '| tipo:', typeof numId);
+  const { data, error, status, statusText } = await db.from('despesas').delete().eq('id', numId).select();
+  console.log('[DELETE DESPESA] status:', status, statusText, '| data:', data, '| error:', error);
   if (error) throw error;
 }
 
@@ -1028,14 +1034,14 @@ function renderHistoricoMensal() {
 ══════════════════════════════════════════ */
 
 function confirmDeleteRecord(id, desc) {
-  deletingId   = id;
+  deletingId   = Number(id);  // converte aqui na origem
   deletingType = 'record';
   document.getElementById('confirm-delete-desc').textContent = `"${desc}"`;
   document.getElementById('modal-confirm-delete').classList.add('open');
 }
 
 function confirmDeleteDespesa(id, desc) {
-  deletingId   = id;
+  deletingId   = Number(id);  // converte aqui na origem
   deletingType = 'despesa';
   document.getElementById('confirm-delete-desc').textContent = `"${desc}"`;
   document.getElementById('modal-confirm-delete').classList.add('open');
@@ -1054,20 +1060,21 @@ async function executeDelete() {
   try {
     if (deletingType === 'record') {
       await deleteRecord(deletingId);
-      records = records.filter(r => r.id !== deletingId);
+      records = records.filter(r => Number(r.id) !== deletingId);
       renderDonaPainel();
       renderEquipe();
       renderCaixa();
     } else {
       await deleteDespesa(deletingId);
-      despesas = despesas.filter(d => d.id !== deletingId);
+      despesas = despesas.filter(d => Number(d.id) !== deletingId);
       renderDespesas();
       renderDonaPainel();
       renderCaixa();
     }
   } catch (err) {
-    console.error('Erro ao excluir:', err);
-    alert('Erro ao excluir. Tente novamente.');
+    const msg = err?.message || err?.details || JSON.stringify(err) || 'Erro desconhecido';
+    console.error('Erro ao excluir:', msg, err);
+    alert('Erro ao excluir:\n' + msg);
   } finally {
     showLoading(false);
   }
