@@ -680,8 +680,8 @@ function movItemHtmlDona(r) {
 
   const btns = canEdit
     ? `<div class="mov-action-btns">
-        <button class="edit-btn" onclick="openEdit(${r.id})">editar</button>
-        <button class="delete-btn" onclick="confirmDeleteRecord(${r.id}, '${r.desc.replace(/'/g, "\\'")}')">excluir</button>
+        <button class="edit-btn" onclick="openEdit('${String(r.id)}')">editar</button>
+        <button class="delete-btn" onclick="confirmDeleteRecord('${String(r.id)}', '${r.desc.replace(/'/g, "\\'")}')">excluir</button>
        </div>`
     : '';
 
@@ -1054,28 +1054,76 @@ function closeConfirmDelete() {
 }
 
 async function executeDelete() {
+
   if (!deletingId || !deletingType) return;
+
+  // salva os valores antes do close
+  const id = deletingId;
+  const type = deletingType;
+
+  // fecha modal sem perder referência
   closeConfirmDelete();
+
   showLoading(true);
+
   try {
+<<<<<<< HEAD
     if (deletingType === 'record') {
       await deleteRecord(deletingId);
       records = records.filter(r => Number(r.id) !== deletingId);
+=======
+
+    if (type === 'record') {
+
+      await deleteRecord(id);
+
+      records = records.filter(
+        r => Number(r.id) !== Number(id)
+      );
+
+>>>>>>> 47b8cdc (Correção no erro ao tentar excluir um registro)
       renderDonaPainel();
       renderEquipe();
       renderCaixa();
+
     } else {
+<<<<<<< HEAD
       await deleteDespesa(deletingId);
       despesas = despesas.filter(d => Number(d.id) !== deletingId);
+=======
+
+      await deleteDespesa(id);
+
+      despesas = despesas.filter(
+        d => Number(d.id) !== Number(id)
+      );
+
+>>>>>>> 47b8cdc (Correção no erro ao tentar excluir um registro)
       renderDespesas();
       renderDonaPainel();
       renderCaixa();
     }
+
   } catch (err) {
+<<<<<<< HEAD
     const msg = err?.message || err?.details || JSON.stringify(err) || 'Erro desconhecido';
     console.error('Erro ao excluir:', msg, err);
     alert('Erro ao excluir:\n' + msg);
+=======
+
+    const msg =
+      err?.message ||
+      err?.details ||
+      JSON.stringify(err) ||
+      'Erro desconhecido';
+
+    console.error('Erro ao excluir:', msg, err);
+
+    alert('Erro ao excluir:\n' + msg);
+
+>>>>>>> 47b8cdc (Correção no erro ao tentar excluir um registro)
   } finally {
+
     showLoading(false);
   }
 }
@@ -1084,7 +1132,9 @@ async function executeDelete() {
    MODAL DE EDIÇÃO (proprietária)
 ══════════════════════════════════════════ */
 function openEdit(id) {
-  const r = records.find(x => x.id === id);
+  const r = records.find(
+  x => String(x.id) === String(id)
+);
   if (!r) return;
   editingId = id;
 
