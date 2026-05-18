@@ -1067,11 +1067,6 @@ async function executeDelete() {
   showLoading(true);
 
   try {
-<<<<<<< HEAD
-    if (deletingType === 'record') {
-      await deleteRecord(deletingId);
-      records = records.filter(r => Number(r.id) !== deletingId);
-=======
 
     if (type === 'record') {
 
@@ -1081,16 +1076,11 @@ async function executeDelete() {
         r => Number(r.id) !== Number(id)
       );
 
->>>>>>> 47b8cdc (Correção no erro ao tentar excluir um registro)
       renderDonaPainel();
       renderEquipe();
       renderCaixa();
 
     } else {
-<<<<<<< HEAD
-      await deleteDespesa(deletingId);
-      despesas = despesas.filter(d => Number(d.id) !== deletingId);
-=======
 
       await deleteDespesa(id);
 
@@ -1098,18 +1088,12 @@ async function executeDelete() {
         d => Number(d.id) !== Number(id)
       );
 
->>>>>>> 47b8cdc (Correção no erro ao tentar excluir um registro)
       renderDespesas();
       renderDonaPainel();
       renderCaixa();
     }
 
   } catch (err) {
-<<<<<<< HEAD
-    const msg = err?.message || err?.details || JSON.stringify(err) || 'Erro desconhecido';
-    console.error('Erro ao excluir:', msg, err);
-    alert('Erro ao excluir:\n' + msg);
-=======
 
     const msg =
       err?.message ||
@@ -1121,7 +1105,6 @@ async function executeDelete() {
 
     alert('Erro ao excluir:\n' + msg);
 
->>>>>>> 47b8cdc (Correção no erro ao tentar excluir um registro)
   } finally {
 
     showLoading(false);
