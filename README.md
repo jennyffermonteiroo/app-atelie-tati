@@ -20,7 +20,8 @@ A aplicação é totalmente responsiva e otimizada para uso em dispositivos móv
 ### 🔐 Login
 
 * Seleção de usuário (colaboradora ou proprietária)
-* Autenticação simples
+* Autenticação via Supabase Auth
+* Regras de acesso protegidas por Row Level Security (RLS)
 
 ---
 
@@ -64,6 +65,10 @@ O sistema utiliza o **Supabase** para:
 
 * Armazenamento de dados
 * Comunicação via API REST
+* Autenticação de usuários
+* Controle de acesso por RLS
+
+> Antes de usar em produção, leia `SECURITY_SETUP.md` e execute o SQL seguro em `schema.sql` ou `migration.sql`.
 
 ---
 

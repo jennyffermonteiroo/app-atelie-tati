@@ -44,7 +44,7 @@
         </select>
         <label>Senha</label>
         <input type="password" id="login-pass" placeholder="••••••" autocomplete="current-password" />
-        <button class="login-btn" onclick="doLogin()">Entrar</button>
+        <button class="login-btn" data-action="login">Entrar</button>
         <div class="login-err" id="login-err"></div>
       </div>
     </div>
@@ -58,22 +58,22 @@
       <div class="topbar-title">✦ Ateliê Tati Brandão</div>
       <div class="topbar-right">
         <span class="topbar-user" id="colab-name-top"></span>
-        <button class="topbar-out" onclick="logout()">Sair</button>
+        <button class="topbar-out" data-action="logout">Sair</button>
       </div>
     </div>
     <div class="nav">
-      <button class="nav-btn active" onclick="switchTab('colab','inicio')">Início</button>
-      <button class="nav-btn" onclick="switchTab('colab','registrar')">Registrar</button>
-      <button class="nav-btn" onclick="switchTab('colab','historico')">Histórico</button>
+      <button class="nav-btn active" data-action="switchTab" data-screen="colab" data-tab="inicio">Início</button>
+      <button class="nav-btn" data-action="switchTab" data-screen="colab" data-tab="registrar">Registrar</button>
+      <button class="nav-btn" data-action="switchTab" data-screen="colab" data-tab="historico">Histórico</button>
     </div>
     <div class="content">
 
       <!-- INÍCIO -->
       <div class="tab-content active" id="colab-inicio">
         <div class="period-nav">
-          <button class="period-nav-btn" onclick="colabNavQuinzena(-1)">&#8592;</button>
+          <button class="period-nav-btn" data-action="colabNav" data-dir="-1">&#8592;</button>
           <div class="quinzena-badge" id="colab-quinzena-badge"></div>
-          <button class="period-nav-btn" onclick="colabNavQuinzena(1)">&#8594;</button>
+          <button class="period-nav-btn" data-action="colabNav" data-dir="1">&#8594;</button>
         </div>
         <div class="cards-row">
           <div class="card">
@@ -98,9 +98,9 @@
       <!-- REGISTRAR -->
       <div class="tab-content" id="colab-registrar">
         <div class="toggle-row">
-          <button class="toggle-btn active" id="tog-ganho"  onclick="setTipo('ganho')">Ganho</button>
-          <button class="toggle-btn"        id="tog-vale"   onclick="setTipo('vale')">Vale</button>
-          <button class="toggle-btn"        id="tog-bronze" onclick="setTipo('bronze')">Bronze</button>
+          <button class="toggle-btn active" id="tog-ganho"  data-action="setTipo" data-tipo="ganho">Ganho</button>
+          <button class="toggle-btn"        id="tog-vale"   data-action="setTipo" data-tipo="vale">Vale</button>
+          <button class="toggle-btn"        id="tog-bronze" data-action="setTipo" data-tipo="bronze">Bronze</button>
         </div>
         <div class="form-group">
           <label>Data do registro</label>
@@ -136,14 +136,14 @@
           </div>
           <div class="form-group">
             <label>Valor total do atendimento (R$)</label>
-            <input type="number" id="r-valor-b" placeholder="Ex: 40,00" min="10.01" step="0.01" inputmode="decimal" oninput="previewBronze()" />
+            <input type="number" id="r-valor-b" placeholder="Ex: 40,00" min="10.01" step="0.01" inputmode="decimal" />
           </div>
           <div class="bronze-preview" id="bronze-preview" style="display:none">
             <span>Você recebe: <strong id="bp-colab">R$ 10,00</strong></span>
             <span>Salão recebe: <strong id="bp-salao">—</strong></span>
           </div>
         </div>
-        <button class="submit-btn" onclick="registrar()">Registrar</button>
+        <button class="submit-btn" data-action="registrar">Registrar</button>
         <div class="success-msg" id="reg-msg"></div>
       </div>
 
@@ -164,23 +164,23 @@
       <div class="topbar-title">✦ Ateliê Tati Brandão</div>
       <div class="topbar-right">
         <span class="topbar-user">Proprietária</span>
-        <button class="topbar-out" onclick="logout()">Sair</button>
+        <button class="topbar-out" data-action="logout">Sair</button>
       </div>
     </div>
     <div class="nav">
-      <button class="nav-btn active" onclick="switchTab('dona','painel')">Painel</button>
-      <button class="nav-btn" onclick="switchTab('dona','equipe')">Equipe</button>
-      <button class="nav-btn" onclick="switchTab('dona','despesas')">Despesas</button>
-      <button class="nav-btn" onclick="switchTab('dona','caixa')">Histórico</button>
+      <button class="nav-btn active" data-action="switchTab" data-screen="dona" data-tab="painel">Painel</button>
+      <button class="nav-btn" data-action="switchTab" data-screen="dona" data-tab="equipe">Equipe</button>
+      <button class="nav-btn" data-action="switchTab" data-screen="dona" data-tab="despesas">Despesas</button>
+      <button class="nav-btn" data-action="switchTab" data-screen="dona" data-tab="caixa">Histórico</button>
     </div>
     <div class="content">
 
       <!-- PAINEL -->
       <div class="tab-content active" id="dona-painel">
         <div class="period-nav">
-          <button class="period-nav-btn" onclick="donaNavMes(-1)">&#8592;</button>
+          <button class="period-nav-btn" data-action="donaNav" data-dir="-1">&#8592;</button>
           <div class="quinzena-badge" id="dona-mes-badge"></div>
-          <button class="period-nav-btn" onclick="donaNavMes(1)">&#8594;</button>
+          <button class="period-nav-btn" data-action="donaNav" data-dir="1">&#8594;</button>
         </div>
         <div class="cards-row">
           <div class="card">
@@ -205,9 +205,9 @@
       <!-- EQUIPE -->
       <div class="tab-content" id="dona-equipe">
         <div class="period-nav">
-          <button class="period-nav-btn" onclick="equipeNavQuinzena(-1)">&#8592;</button>
+          <button class="period-nav-btn" data-action="equipeNav" data-dir="-1">&#8592;</button>
           <div class="quinzena-badge" id="equipe-quinzena-badge"></div>
-          <button class="period-nav-btn" onclick="equipeNavQuinzena(1)">&#8594;</button>
+          <button class="period-nav-btn" data-action="equipeNav" data-dir="1">&#8594;</button>
         </div>
         <div id="dona-equipe-list"></div>
       </div>
@@ -222,7 +222,7 @@
           <label>Valor (R$)</label>
           <input type="number" id="d-valor" placeholder="0,00" min="0" step="0.01" inputmode="decimal" />
         </div>
-        <button class="submit-btn" onclick="addDespesa()">Registrar despesa</button>
+        <button class="submit-btn" data-action="addDespesa">Registrar despesa</button>
         <div class="success-msg" id="desp-msg"></div>
         <div class="section-head" style="margin-top: 1rem">Despesas registradas</div>
         <div class="card" style="padding: 0 14px">
@@ -258,7 +258,7 @@
       <!-- Campo exclusivo para bronze: edita o total -->
       <div class="form-group" id="m-val-bronze-group" style="display:none">
         <label>Valor total do atendimento (R$)</label>
-        <input type="number" id="m-val-bronze" step="0.01" min="10.01" inputmode="decimal" oninput="previewEditBronze()" />
+        <input type="number" id="m-val-bronze" step="0.01" min="10.01" inputmode="decimal" />
         <div class="bronze-preview" id="m-bronze-preview" style="display:none;margin-top:8px">
           <span>Colaboradora recebe: <strong id="m-bp-colab">R$ 10,00</strong></span>
           <span>Salão recebe: <strong id="m-bp-salao">—</strong></span>
@@ -269,8 +269,8 @@
         <input type="date" id="m-data" />
       </div>
       <div class="modal-actions">
-        <button class="btn-cancel" onclick="closeModal()">Cancelar</button>
-        <button class="btn-save" onclick="saveEdit()">Salvar</button>
+        <button class="btn-cancel" data-action="closeModal">Cancelar</button>
+        <button class="btn-save" data-action="saveEdit">Salvar</button>
       </div>
     </div>
   </div>
@@ -294,8 +294,8 @@
         <input type="date" id="md-data" />
       </div>
       <div class="modal-actions">
-        <button class="btn-cancel" onclick="closeModalDespesa()">Cancelar</button>
-        <button class="btn-save" onclick="saveEditDespesa()">Salvar</button>
+        <button class="btn-cancel" data-action="closeModalDespesa">Cancelar</button>
+        <button class="btn-save" data-action="saveEditDespesa">Salvar</button>
       </div>
     </div>
   </div>
@@ -309,8 +309,8 @@
       <div class="modal-confirm-title">Excluir registro?</div>
       <div class="modal-confirm-desc" id="confirm-delete-desc">Esta ação não pode ser desfeita.</div>
       <div class="modal-confirm-actions">
-        <button class="btn-confirm-cancel" onclick="closeConfirmDelete()">Cancelar</button>
-        <button class="btn-confirm-ok" onclick="executeDelete()">Sim, excluir</button>
+        <button class="btn-confirm-cancel" data-action="closeConfirmDelete">Cancelar</button>
+        <button class="btn-confirm-ok" data-action="executeDelete">Sim, excluir</button>
       </div>
     </div>
   </div>
@@ -318,7 +318,7 @@
 </div><!-- #app -->
 
 <!-- Supabase CDN -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="script.js"></script>
 </body>
 </html>
