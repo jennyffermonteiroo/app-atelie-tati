@@ -1,0 +1,1494 @@
+/* ══════════════════════════════════════════
+   ATELIÊ TATI BRANDÃO — Gestão Financeira
+   script.js — versão Supabase
+══════════════════════════════════════════ */
+
+/* ══════════════════════════════════════════
+   CONFIGURAÇÃO
+   A chave anon pode ficar no cliente somente com RLS ativo.
+   Nunca use a service_role key no frontend.
+══════════════════════════════════════════ */
+const SUPABASE_URL = window.__ENV?.SUPABASE_URL || '';
+const SUPABASE_ANON = window.__ENV?.SUPABASE_ANON_KEY || '';
+
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: false,
+  },
+});
+
+/* ══════════════════════════════════════════
+   USUÁRIOS
+   As senhas foram removidas do frontend. Elas devem existir
+   apenas no Supabase Auth. Estes e-mails sao identificadores
+   publicos de login, nao segredos.
+══════════════════════════════════════════ */
+const USERS = {
+  fabiola: { name: 'Fabíola', email: 'fabiola@atelietatibrandao.app', role: 'colab' },
+  kaylane: { name: 'Kaylane', email: 'kaylane@atelietatibrandao.app', role: 'colab' },
+  tati:    { name: 'Tati',    email: 'tati@atelietatibrandao.app',    role: 'colab' },
+  salao:   { name: 'Salão',   email: 'salao@atelietatibrandao.app',   role: 'dona'  },
+};
+
+// Controle de tentativas de login
+let loginAttempts = 0;
+let loginBlockedUntil = 0;
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOGIN_BLOCK_MS = 30 * 60 * 1000; // 30 minutos
+
+const COLABS = ['fabiola', 'kaylane', 'tati'];
+
+let currentUser      = null;
+let editingId        = null;
+let editingDespesaId = null;
+let deletingId       = null;   // ID do record a excluir
+let deletingType     = null;   // 'record' ou 'despesa'
+
+// Offset de navegação: 0 = período atual, -1 = anterior, etc.
+let colabQuinzenaOffset  = 0;
+let equipeQuinzenaOffset = 0;
+let donaMesOffset        = 0;
+
+/* ══════════════════════════════════════════
+   ESTADO (cache local — carregado do Supabase)
+══════════════════════════════════════════ */
+let records          = [];
+let despesas         = [];
+let caixaFechamentos = [];
+
+/* ══════════════════════════════════════════
+   HELPERS — UI
+══════════════════════════════════════════ */
+function showLoading(show) {
+  document.getElementById('loading-overlay').style.display = show ? 'flex' : 'none';
+}
+
+function showToast(msg, tipo = 'ok') {
+  // Usa os campos de success-msg existentes no contexto atual
+  const ids = ['reg-msg','desp-msg','cx-msg'];
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.offsetParent !== null) {
+      el.textContent = msg;
+      el.style.color = tipo === 'erro' ? 'var(--danger)' : 'var(--success)';
+      setTimeout(() => { el.textContent = ''; el.style.color = ''; }, 3000);
+    }
+  });
+}
+
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function setHtml(elId, html) {
+  const el = document.getElementById(elId);
+  if (el) el.innerHTML = html;
+}
+
+function requireAuth() {
+  if (!currentUser) throw new Error('Sessão expirada. Entre novamente.');
+}
+
+function requireDona() {
+  requireAuth();
+  if (currentUser.role !== 'dona') throw new Error('Acesso restrito à proprietária.');
+}
+
+function limitText(value, max = 120) {
+  return String(value ?? '').trim().slice(0, max);
+}
+
+/* ══════════════════════════════════════════
+   HELPERS — FORMATAÇÃO
+══════════════════════════════════════════ */
+function brl(v) {
+  return 'R$ ' + Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function fmtShort(d) {
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+}
+
+function fmtFull(ts) {
+  const d = new Date(ts);
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+    + ' ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
+/* ══════════════════════════════════════════
+   HELPERS — DATA
+══════════════════════════════════════════ */
+
+/** "YYYY-MM-DD" → timestamp local às 12h */
+function dateInputToTs(dateStr) {
+  if (!dateStr) return Date.now();
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d, 12, 0, 0).getTime();
+}
+
+/** timestamp → "YYYY-MM-DD" */
+function tsToDateInput(ts) {
+  const d  = new Date(ts);
+  const yy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yy}-${mm}-${dd}`;
+}
+
+/** timestamp → "YYYY-MM-DD" para salvar no Supabase (coluna date) */
+function tsToDateDB(ts) {
+  return tsToDateInput(ts);
+}
+
+/** "YYYY-MM-DD" (string do Supabase) → timestamp local às 12h */
+function dateDBToTs(dateStr) {
+  return dateInputToTs(dateStr);
+}
+
+function setDefaultDate() {
+  const el = document.getElementById('r-data');
+  if (el) el.value = tsToDateInput(Date.now());
+}
+
+/* ══════════════════════════════════════════
+   HELPERS — QUINZENA
+   Ciclo: 21 → 05 e 06 → 20
+══════════════════════════════════════════ */
+function getQuinzena(ts) {
+  const dt  = new Date(ts);
+  const day = dt.getDate();
+  const m   = dt.getMonth();
+  const y   = dt.getFullYear();
+
+  let s, e;
+  if (day >= 21) {
+    s = new Date(y, m, 21);
+    e = new Date(y, m + 1, 5);
+  } else if (day <= 5) {
+    s = new Date(y, m - 1, 21);
+    e = new Date(y, m, 5);
+  } else {
+    s = new Date(y, m, 6);
+    e = new Date(y, m, 20);
+  }
+  return { s, e, label: `${fmtShort(s)} – ${fmtShort(e)}` };
+}
+
+function quinzenaKey(ts) {
+  return getQuinzena(ts).s.toISOString().slice(0, 10);
+}
+
+function inQuinzena(ts, q) {
+  return ts >= q.s.getTime() && ts <= q.e.getTime() + 86_399_999;
+}
+
+function isToday(ts) {
+  const d = new Date(ts);
+  const n = new Date();
+  return d.getDate()     === n.getDate()
+      && d.getMonth()    === n.getMonth()
+      && d.getFullYear() === n.getFullYear();
+}
+
+function agruparPorQuinzena(list) {
+  const map = new Map();
+  list.forEach(r => {
+    const key = quinzenaKey(r.ts);
+    if (!map.has(key)) {
+      const q = getQuinzena(r.ts);
+      map.set(key, { key, label: q.label, s: q.s, items: [] });
+    }
+    map.get(key).items.push(r);
+  });
+  return Array.from(map.values()).sort((a, b) => b.s - a.s);
+}
+
+/* ══════════════════════════════════════════
+   HELPERS — MÊS (para perfil dona)
+══════════════════════════════════════════ */
+
+/** Retorna { s, e, label } para o mês com offset relativo ao atual */
+function getMesOffset(offset) {
+  const now = new Date();
+  const y   = now.getFullYear();
+  const m   = now.getMonth() + offset; // pode ser negativo, JS normaliza
+  const s   = new Date(y, m, 1);
+  const e   = new Date(y, m + 1, 0);  // último dia do mês
+  const label = s.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  return { s, e, label: label.charAt(0).toUpperCase() + label.slice(1) };
+}
+
+function inMes(ts, mes) {
+  return ts >= mes.s.getTime() && ts <= mes.e.getTime() + 86_399_999;
+}
+
+/** Agrupa records/despesas por mês (YYYY-MM) para o histórico */
+function agruparPorMes(recList, despList) {
+  const map = new Map();
+
+  const addToMap = (ts, cb) => {
+    const d   = new Date(ts);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    if (!map.has(key)) {
+      const label = d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+      map.set(key, {
+        key,
+        label: label.charAt(0).toUpperCase() + label.slice(1),
+        s: new Date(d.getFullYear(), d.getMonth(), 1),
+        records: [],
+        despesas: [],
+      });
+    }
+    cb(map.get(key));
+  };
+
+  recList.forEach(r  => addToMap(r.ts,  g => g.records.push(r)));
+  despList.forEach(d => addToMap(d.ts,  g => g.despesas.push(d)));
+
+  return Array.from(map.values()).sort((a, b) => b.s - a.s);
+}
+
+/* ══════════════════════════════════════════
+   NAVEGAÇÃO DE PERÍODO
+══════════════════════════════════════════ */
+
+function colabNavQuinzena(dir) {
+  colabQuinzenaOffset += dir;
+  if (colabQuinzenaOffset > 0) colabQuinzenaOffset = 0;
+  renderColab();
+}
+
+function equipeNavQuinzena(dir) {
+  equipeQuinzenaOffset += dir;
+  if (equipeQuinzenaOffset > 0) equipeQuinzenaOffset = 0;
+  renderEquipe();
+}
+
+function donaNavMes(dir) {
+  donaMesOffset += dir;
+  if (donaMesOffset > 0) donaMesOffset = 0;
+  renderDonaPainel();
+}
+
+/* ══════════════════════════════════════════
+   SUPABASE — CARREGAR DADOS
+══════════════════════════════════════════ */
+
+/** Converte linha do Supabase (tabela records) para objeto interno */
+function rowToRecord(row) {
+  return {
+    id:           row.id,
+    user:         row.user_key,
+    type:         row.type,
+    desc:         row.descricao,
+    cliente:      row.cliente || '',
+    val:          parseFloat(row.valor),
+    bronze_salao: parseFloat(row.bronze_salao) || 0,
+    ts:           dateDBToTs(row.data_ref),
+    fechado:      row.fechado || false,
+  };
+}
+
+/** Converte linha do Supabase (tabela despesas) para objeto interno */
+function rowToDespesa(row) {
+  return {
+    id:    row.id,
+    desc:  row.descricao,
+    val:   parseFloat(row.valor),
+    ts:    dateDBToTs(row.data_ref),
+  };
+}
+
+/** Converte linha do Supabase (tabela caixa_fechamentos) para objeto interno */
+function rowToFechamento(row) {
+  return {
+    id:  row.id,
+    val: parseFloat(row.valor),
+    ts:  new Date(row.criado_em).getTime(),
+  };
+}
+
+async function loadAll() {
+  showLoading(true);
+  try {
+    requireAuth();
+
+    if (currentUser.role === 'dona') {
+      const [rRecords, rDespesas, rFechamentos] = await Promise.all([
+        db.from('records').select('*').order('data_ref', { ascending: false }),
+        db.from('despesas').select('*').order('data_ref', { ascending: false }),
+        db.from('caixa_fechamentos').select('*').order('criado_em', { ascending: false }),
+      ]);
+
+      if (rRecords.error) throw rRecords.error;
+      if (rDespesas.error) throw rDespesas.error;
+      if (rFechamentos.error) throw rFechamentos.error;
+
+      records = (rRecords.data || []).map(rowToRecord);
+      despesas = (rDespesas.data || []).map(rowToDespesa);
+      caixaFechamentos = (rFechamentos.data || []).map(rowToFechamento);
+      return;
+    }
+
+    const { data, error } = await db
+      .from('records')
+      .select('*')
+      .eq('user_key', currentUser.key)
+      .order('data_ref', { ascending: false });
+
+    if (error) throw error;
+
+    records = (data || []).map(rowToRecord);
+    despesas = [];
+    caixaFechamentos = [];
+  } catch (err) {
+    console.error('Erro ao carregar dados:', err);
+    alert('Erro ao conectar com o banco de dados. Verifique a URL e a chave do Supabase.');
+  } finally {
+    showLoading(false);
+  }
+}
+
+/* ══════════════════════════════════════════
+   SUPABASE — SALVAR / EDITAR / (futuro: deletar)
+══════════════════════════════════════════ */
+
+async function insertRecord(obj) {
+  requireAuth();
+  const { data, error } = await db.from('records').insert({
+    user_key:     obj.user,
+    type:         obj.type,
+    descricao:    obj.desc,
+    cliente:      obj.cliente || '',
+    valor:        obj.val,
+    bronze_salao: obj.bronze_salao || 0,
+    data_ref:     tsToDateDB(obj.ts),
+    fechado:      false,
+  }).select().single();
+
+  if (error) throw error;
+  return rowToRecord(data);
+}
+
+async function updateRecord(obj) {
+  requireDona();
+  const { error } = await db.from('records').update({
+    descricao: obj.desc,
+    cliente:   obj.cliente || '',
+    valor:     obj.val,
+    bronze_salao: obj.bronze_salao || 0,
+    data_ref:  tsToDateDB(obj.ts),
+    fechado:   obj.fechado,
+  }).eq('id', obj.id);
+
+  if (error) throw error;
+}
+
+async function insertDespesa(obj) {
+  requireDona();
+  const { data, error } = await db.from('despesas').insert({
+    descricao: obj.desc,
+    valor:     obj.val,
+    data_ref:  tsToDateDB(obj.ts),
+  }).select().single();
+
+  if (error) throw error;
+  return rowToDespesa(data);
+}
+
+async function insertFechamento(valor) {
+  requireDona();
+  const { data, error } = await db.from('caixa_fechamentos').insert({
+    valor,
+  }).select().single();
+
+  if (error) throw error;
+  return rowToFechamento(data);
+}
+
+async function updateDespesa(obj) {
+  requireDona();
+  const { error } = await db.from('despesas').update({
+    descricao: obj.desc,
+    valor:     obj.val,
+    data_ref:  tsToDateDB(obj.ts),
+  }).eq('id', obj.id);
+
+  if (error) throw error;
+}
+
+async function deleteRecord(id) {
+  requireDona();
+  const numId = Number(id);
+  const { error } = await db.from('records').delete().eq('id', numId);
+  if (error) throw error;
+}
+
+async function deleteDespesa(id) {
+  requireDona();
+  const numId = Number(id);
+  const { error } = await db.from('despesas').delete().eq('id', numId);
+  if (error) throw error;
+}
+
+/* ══════════════════════════════════════════
+   AUTH
+══════════════════════════════════════════ */
+async function loadProfile() {
+  const { data: { user }, error: userError } = await db.auth.getUser();
+  if (userError || !user) {
+    currentUser = null;
+    return null;
+  }
+
+  const { data, error } = await db
+    .from('profiles')
+    .select('user_key, nome, role')
+    .eq('id', user.id)
+    .single();
+
+  if (error) throw error;
+  currentUser = {
+    id: user.id,
+    key: data.user_key,
+    name: data.nome,
+    role: data.role,
+  };
+  return currentUser;
+}
+
+async function enterApp() {
+  await loadAll();
+
+  if (currentUser.role === 'dona') {
+    showScreen('s-dona');
+    activateTab('dona', 'painel');
+    renderDona();
+  } else {
+    document.getElementById('colab-name-top').textContent = currentUser.name;
+    showScreen('s-colab');
+    activateTab('colab', 'inicio');
+    setDefaultDate();
+    renderColab();
+  }
+}
+
+async function doLogin() {
+  const key  = document.getElementById('login-user').value;
+  const pass = document.getElementById('login-pass').value;
+  const err  = document.getElementById('login-err');
+
+  // Verifica bloqueio ativo
+  if (Date.now() < loginBlockedUntil) {
+    const min = Math.ceil((loginBlockedUntil - Date.now()) / 60000);
+    err.textContent = `Muitas tentativas. Tente novamente em ${min} minuto(s).`;
+    return;
+  }
+
+  if (!key) { err.textContent = 'Selecione um perfil.'; return; }
+  if (!pass) { err.textContent = 'Informe a senha.'; return; }
+
+  const user = USERS[key];
+  showLoading(true);
+  try {
+    const { error } = await db.auth.signInWithPassword({
+      email: user.email,
+      password: pass,
+    });
+    if (error) throw error;
+
+    await loadProfile();
+    if (!currentUser || currentUser.key !== key) {
+      await db.auth.signOut();
+      throw new Error('Este login não pertence ao perfil selecionado.');
+    }
+
+    // Login ok — zera tentativas
+    loginAttempts = 0;
+    loginBlockedUntil = 0;
+    err.textContent = '';
+    document.getElementById('login-pass').value = '';
+    await enterApp();
+
+  } catch (loginError) {
+    loginAttempts++;
+    if (loginAttempts >= MAX_LOGIN_ATTEMPTS) {
+      loginBlockedUntil = Date.now() + LOGIN_BLOCK_MS;
+      loginAttempts = 0;
+      err.textContent = 'Muitas tentativas incorretas. Aguarde 30 minutos.';
+    } else {
+      const restantes = MAX_LOGIN_ATTEMPTS - loginAttempts;
+      err.textContent = `Senha incorreta. ${restantes} tentativa(s) restante(s).`;
+    }
+    currentUser = null;
+  } finally {
+    showLoading(false);
+  }
+}
+
+async function logout() {
+  await db.auth.signOut();
+  currentUser = null;
+  records = []; despesas = []; caixaFechamentos = [];
+  colabQuinzenaOffset  = 0;
+  equipeQuinzenaOffset = 0;
+  donaMesOffset        = 0;
+  showScreen('s-login');
+  document.getElementById('login-pass').value = '';
+  document.getElementById('login-user').value = '';
+}
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => {
+    s.classList.toggle('active', s.id === id);
+  });
+}
+
+function activateTab(screen, tab) {
+  const allTabs = ['inicio','registrar','historico','painel','equipe','despesas','caixa'];
+
+  allTabs.forEach(t => {
+    const el = document.getElementById(`${screen}-${t}`);
+    if (el) el.classList.remove('active');
+  });
+
+  const target = document.getElementById(`${screen}-${tab}`);
+  if (target) target.classList.add('active');
+
+  document.querySelectorAll(`#s-${screen} .nav-btn`).forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tab);
+  });
+}
+
+/* ══════════════════════════════════════════
+   NAVEGAÇÃO POR ABAS
+══════════════════════════════════════════ */
+function switchTab(screen, tab) {
+  if (screen === 'dona' && (!currentUser || currentUser.role !== 'dona')) return;
+  if (screen === 'colab' && (!currentUser || currentUser.role !== 'colab')) return;
+
+  activateTab(screen, tab);
+
+  if (screen === 'dona') {
+    if      (tab === 'painel')   renderDonaPainel();
+    else if (tab === 'equipe')   renderEquipe();
+    else if (tab === 'despesas') renderDespesas();
+    else if (tab === 'caixa')    renderCaixa();
+  } else {
+    if (tab === 'registrar') setDefaultDate();
+    renderColab();
+  }
+}
+
+/* ══════════════════════════════════════════
+   TOGGLE GANHO / VALE / BRONZE
+══════════════════════════════════════════ */
+let regTipo = 'ganho';
+
+function setTipo(t) {
+  regTipo = t;
+  document.getElementById('tog-ganho').classList.toggle('active',  t === 'ganho');
+  document.getElementById('tog-vale').classList.toggle('active',   t === 'vale');
+  document.getElementById('tog-bronze').classList.toggle('active', t === 'bronze');
+  document.getElementById('form-ganho').style.display  = t === 'ganho'  ? 'block' : 'none';
+  document.getElementById('form-vale').style.display   = t === 'vale'   ? 'block' : 'none';
+  document.getElementById('form-bronze').style.display = t === 'bronze' ? 'block' : 'none';
+}
+
+/** Atualiza o preview em tempo real ao digitar o valor do Bronze */
+function previewBronze() {
+  const val  = parseFloat(document.getElementById('r-valor-b').value);
+  const prev = document.getElementById('bronze-preview');
+  if (!isNaN(val) && val > 10) {
+    prev.style.display = 'flex';
+    document.getElementById('bp-colab').textContent = brl(10);
+    document.getElementById('bp-salao').textContent = brl(val - 10);
+  } else {
+    prev.style.display = 'none';
+  }
+}
+
+/* ══════════════════════════════════════════
+   REGISTRAR (colaboradora)
+══════════════════════════════════════════ */
+async function registrar() {
+  if (!currentUser || currentUser.role !== 'colab') {
+    alert('Apenas colaboradoras podem registrar movimentações.');
+    return;
+  }
+
+  let val, desc, cliente = '', bronze_salao = 0;
+
+  if (regTipo === 'ganho') {
+    val     = parseFloat(document.getElementById('r-valor-g').value);
+    cliente = limitText(document.getElementById('r-cliente').value, 80);
+    desc    = 'Atendimento' + (cliente ? ' — ' + cliente : '');
+    if (!cliente || isNaN(val) || val <= 0) {
+      alert('Preencha o nome da cliente e o valor.');
+      return;
+    }
+
+  } else if (regTipo === 'vale') {
+    val  = parseFloat(document.getElementById('r-valor-v').value);
+    desc = limitText(document.getElementById('r-desc-v').value, 120);
+    if (!desc || isNaN(val) || val <= 0) {
+      alert('Preencha a descrição e o valor.');
+      return;
+    }
+
+  } else if (regTipo === 'bronze') {
+    const total = parseFloat(document.getElementById('r-valor-b').value);
+    cliente     = limitText(document.getElementById('r-cliente-b').value, 80);
+    if (!cliente || isNaN(total) || total <= 10) {
+      alert('Preencha o nome da cliente e um valor maior que R$ 10,00.');
+      return;
+    }
+    val          = 10;           // colaboradora recebe R$10 fixo, sem desconto de 30%
+    bronze_salao = total - 10;   // excedente vai direto para o salão
+    desc         = 'Bronze — ' + cliente;
+  }
+
+  const ts = dateInputToTs(document.getElementById('r-data').value);
+
+  showLoading(true);
+  try {
+    const novo = await insertRecord({
+      user: currentUser.key,
+      type: regTipo,
+      desc,
+      cliente,
+      val,
+      bronze_salao,
+      ts,
+    });
+
+    records.unshift(novo);
+
+    document.getElementById('r-cliente').value   = '';
+    document.getElementById('r-valor-g').value   = '';
+    document.getElementById('r-desc-v').value    = '';
+    document.getElementById('r-valor-v').value   = '';
+    document.getElementById('r-cliente-b').value = '';
+    document.getElementById('r-valor-b').value   = '';
+    document.getElementById('bronze-preview').style.display = 'none';
+    setDefaultDate();
+
+    const msg = document.getElementById('reg-msg');
+    msg.textContent = 'Registrado com sucesso!';
+    setTimeout(() => msg.textContent = '', 2500);
+
+    renderColab();
+  } catch (err) {
+    console.error('Erro ao registrar:', err);
+    alert('Erro ao salvar. Tente novamente.');
+  } finally {
+    showLoading(false);
+  }
+}
+
+/* ══════════════════════════════════════════
+   RENDER — COLABORADORA
+══════════════════════════════════════════ */
+function renderColab() {
+  if (!currentUser || currentUser.role !== 'colab') return;
+
+  // Calcula a quinzena com base no offset de navegação
+  const refTs = (() => {
+    if (colabQuinzenaOffset === 0) return Date.now();
+    // Recua N quinzenas a partir de hoje
+    let ts = Date.now();
+    for (let i = 0; i < Math.abs(colabQuinzenaOffset); i++) {
+      const q  = getQuinzena(ts);
+      ts = q.s.getTime() - 1; // 1ms antes do início da quinzena atual = quinzena anterior
+    }
+    return ts;
+  })();
+
+  const q        = getQuinzena(refTs);
+  const isAtual  = colabQuinzenaOffset === 0;
+
+  const myRec    = records.filter(r => r.user === currentUser.key);
+  const qRec     = myRec.filter(r => inQuinzena(r.ts, q));
+  const todayRec = myRec.filter(r => isToday(r.ts));
+
+  // Quinzena selecionada
+  const brutoNormal = qRec.filter(r => r.type === 'ganho').reduce((s, r) => s + r.val, 0);
+  const brutoBronze = qRec.filter(r => r.type === 'bronze').reduce((s, r) => s + r.val, 0);
+  const valesQ      = qRec.filter(r => r.type === 'vale').reduce((s, r) => s + r.val, 0);
+  const liquidoQ    = (brutoNormal * 0.7) + brutoBronze - valesQ;
+
+  // Hoje (só faz sentido na quinzena atual)
+  const brutoNormalHoje = todayRec.filter(r => r.type === 'ganho').reduce((s, r) => s + r.val, 0);
+  const brutoBronzeHoje = todayRec.filter(r => r.type === 'bronze').reduce((s, r) => s + r.val, 0);
+  const valesHoje       = todayRec.filter(r => r.type === 'vale').reduce((s, r) => s + r.val, 0);
+  const diaLiq          = isAtual ? (brutoNormalHoje * 0.7) + brutoBronzeHoje - valesHoje : null;
+
+  const badgeEl = document.getElementById('colab-quinzena-badge');
+  badgeEl.textContent = q.label + (isAtual ? '' : '');
+
+  document.getElementById('c-saldo-dia').textContent      = diaLiq !== null ? brl(Math.max(0, diaLiq)) : '—';
+  document.getElementById('c-saldo-quinzena').textContent = brl(Math.max(0, liquidoQ));
+  document.getElementById('c-bruto').textContent          = brl(brutoNormal + brutoBronze);
+
+  // Seta "próximo" desabilitada se estiver na quinzena atual
+  document.querySelectorAll('.period-nav-btn').forEach((btn, i) => {
+    if (i === 1) btn.disabled = isAtual; // botão direito (→)
+  });
+
+  renderMovs('colab-movs', qRec.slice().sort((a,b) => b.ts - a.ts), false);
+  renderHistoricoQuinzenas('colab-hist-quinzenas', myRec);
+}
+
+/* ══════════════════════════════════════════
+   RENDER — MOVIMENTAÇÕES
+══════════════════════════════════════════ */
+function renderMovs(elId, list, showUser) {
+  const el = document.getElementById(elId);
+  if (!list.length) {
+    el.innerHTML = '<div class="empty-state">Nenhum registro nesta quinzena.</div>';
+    return;
+  }
+  el.innerHTML = list.map(r => movItemHtml(r, showUser)).join('');
+}
+
+function movItemHtml(r, showUser) {
+  const isGanho   = r.type === 'ganho';
+  const isBronze  = r.type === 'bronze';
+  const isVale    = r.type === 'vale';
+  const isDespesa = r.type === 'despesa';
+
+  let valorDisplay, tipoLabel;
+  if (isGanho) {
+    valorDisplay = '+' + brl(r.val);
+    tipoLabel    = 'líq: ' + brl(r.val * 0.7);
+  } else if (isBronze) {
+    valorDisplay = '+' + brl(r.val);
+    tipoLabel    = 'bronze · salão: ' + brl(r.bronze_salao || 0);
+  } else if (isDespesa) {
+    valorDisplay = '-' + brl(r.val);
+    tipoLabel    = 'despesa';
+  } else {
+    valorDisplay = '-' + brl(r.val);
+    tipoLabel    = 'vale';
+  }
+
+  const userLabel = showUser && USERS[r.user] ? USERS[r.user].name + ' · ' : '';
+  return `
+    <div class="mov-item">
+      <div>
+        <div class="mov-desc">${escapeHtml(r.desc)}</div>
+        <div class="mov-meta">${escapeHtml(userLabel)}${escapeHtml(fmtFull(r.ts))}</div>
+      </div>
+      <div>
+        <div class="mov-val ${(isGanho || isBronze) ? 'pos' : 'neg'}">${escapeHtml(valorDisplay)}</div>
+        <div class="mov-type">${escapeHtml(tipoLabel)}</div>
+      </div>
+    </div>`;
+}
+
+/* ══════════════════════════════════════════
+   RENDER — MOVIMENTAÇÕES COM EDITAR (dona painel)
+══════════════════════════════════════════ */
+function movItemHtmlDona(r) {
+  const isGanho   = r.type === 'ganho';
+  const isBronze  = r.type === 'bronze';
+  const isDespesa = r.type === 'despesa';
+
+  let valorDisplay, tipoLabel;
+  if (isGanho) {
+    valorDisplay = '+' + brl(r.val);
+    tipoLabel    = 'líq: ' + brl(r.val * 0.7);
+  } else if (isBronze) {
+    valorDisplay = '+' + brl(r.val);
+    tipoLabel    = 'bronze · salão: ' + brl(r.bronze_salao || 0);
+  } else if (isDespesa) {
+    valorDisplay = '-' + brl(r.val);
+    tipoLabel    = 'despesa';
+  } else {
+    valorDisplay = '-' + brl(r.val);
+    tipoLabel    = 'vale';
+  }
+
+  const userName = USERS[r.user] ? USERS[r.user].name + ' · ' : '';
+  const canEdit  = !isDespesa;
+
+  const btns = canEdit
+    ? `<div class="mov-action-btns">
+        <button class="edit-btn" data-action="open-edit" data-id="${escapeHtml(r.id)}">editar</button>
+        <button class="delete-btn" data-action="confirm-delete-record" data-id="${escapeHtml(r.id)}">excluir</button>
+       </div>`
+    : '';
+
+  return `
+    <div class="mov-item">
+      <div>
+        <div class="mov-desc">${escapeHtml(r.desc)}</div>
+        <div class="mov-meta">${escapeHtml(userName)}${escapeHtml(fmtFull(r.ts))}</div>
+        ${btns}
+      </div>
+      <div style="text-align:right">
+        <div class="mov-val ${(isGanho || isBronze) ? 'pos' : 'neg'}">${escapeHtml(valorDisplay)}</div>
+        <div class="mov-type">${escapeHtml(tipoLabel)}</div>
+      </div>
+    </div>`;
+}
+
+/* ══════════════════════════════════════════
+   RENDER — HISTÓRICO POR QUINZENA (accordion)
+══════════════════════════════════════════ */
+function renderHistoricoQuinzenas(elId, allRecords) {
+  const el = document.getElementById(elId);
+
+  if (!allRecords.length) {
+    el.innerHTML = '<div class="empty-state">Nenhum registro ainda.</div>';
+    return;
+  }
+
+  const grupos = agruparPorQuinzena(allRecords);
+  const qAtual = quinzenaKey(Date.now());
+
+  el.innerHTML = grupos.map((g, idx) => {
+    const isAtual   = g.key === qAtual;
+    const isOpen    = isAtual || idx === 0;
+    const bruto     = g.items.filter(r => r.type === 'ganho').reduce((s, r) => s + r.val, 0);
+    const bronze    = g.items.filter(r => r.type === 'bronze').reduce((s, r) => s + r.val, 0);
+    const vales     = g.items.filter(r => r.type === 'vale').reduce((s, r) => s + r.val, 0);
+    const liquido   = (bruto * 0.7) + bronze - vales;
+    const itemsHtml = g.items.slice().sort((a,b) => b.ts - a.ts).map(r => movItemHtml(r, false)).join('');
+
+    return `
+      <div class="hist-group">
+        <button class="hist-group-header ${isOpen ? 'open' : ''}" data-action="toggle-hist">
+          <div class="hist-group-label">
+            <span class="hist-group-period">${escapeHtml(g.label)}</span>
+            ${isAtual ? '<span class="hist-badge-atual">atual</span>' : ''}
+          </div>
+          <div class="hist-group-summary">
+            <span class="hist-group-liq">${escapeHtml(brl(Math.max(0, liquido)))}</span>
+            <span class="hist-group-arrow">${isOpen ? '▲' : '▼'}</span>
+          </div>
+        </button>
+        <div class="hist-group-body ${isOpen ? 'open' : ''}">
+          <div class="hist-group-totals">
+            <span>Bruto: ${escapeHtml(brl(bruto + bronze))}</span>
+            <span>Vales: -${escapeHtml(brl(vales))}</span>
+            <span>Líquido: ${escapeHtml(brl(Math.max(0, liquido)))}</span>
+          </div>
+          <div style="padding: 0 14px">${itemsHtml}</div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function toggleHistGroup(btn) {
+  const body   = btn.nextElementSibling;
+  const isOpen = body.classList.contains('open');
+  body.classList.toggle('open', !isOpen);
+  btn.classList.toggle('open', !isOpen);
+  btn.querySelector('.hist-group-arrow').textContent = !isOpen ? '▲' : '▼';
+}
+
+/* ══════════════════════════════════════════
+   RENDER — PROPRIETÁRIA
+══════════════════════════════════════════ */
+function renderDona() {
+  renderDonaPainel();
+  renderEquipe();
+  renderDespesas();
+  renderCaixa();
+}
+
+function renderDonaPainel() {
+  const mes    = getMesOffset(donaMesOffset);
+  const isAtual = donaMesOffset === 0;
+
+  const mRec  = records.filter(r => inMes(r.ts, mes));
+  const despM = despesas.filter(d => inMes(d.ts, mes)).reduce((s, d) => s + d.val, 0);
+
+  // 30% dos ganhos normais do mês
+  const trinta_normal = mRec
+    .filter(r => r.type === 'ganho')
+    .reduce((s, r) => s + r.val, 0) * 0.3;
+
+  // Bronze: excedente vai direto para o salão
+  const trinta_bronze = mRec
+    .filter(r => r.type === 'bronze')
+    .reduce((s, r) => s + (r.bronze_salao || 0), 0);
+
+  const salaM    = trinta_normal + trinta_bronze;
+  const liqSalao = salaM - despM;
+
+  const badgeEl = document.getElementById('dona-mes-badge');
+  badgeEl.textContent = mes.label;
+
+  document.getElementById('d-30-quin').textContent   = brl(salaM);
+  document.getElementById('d-desp-q').textContent    = brl(despM);
+  document.getElementById('d-liq-salao').textContent = brl(liqSalao);
+
+  // Desabilita botão → quando estiver no mês atual
+  const navBtns = document.querySelectorAll('#s-dona .period-nav-btn');
+  navBtns.forEach((btn, i) => { if (i === 1) btn.disabled = isAtual; });
+
+  // Movimentações do mês com botão editar nos records (não despesas)
+  const mMovs = [
+    ...mRec,
+    ...despesas
+      .filter(d => inMes(d.ts, mes))
+      .map(d => ({ ...d, user: 'salao', type: 'despesa', desc: '📋 ' + d.desc, cliente: '', bronze_salao: 0 })),
+  ].sort((a, b) => b.ts - a.ts);
+
+  const el = document.getElementById('dona-movs');
+  el.innerHTML = mMovs.length
+    ? mMovs.map(r => movItemHtmlDona(r)).join('')
+    : '<div class="empty-state">Nenhum registro neste mês.</div>';
+}
+
+/* ══════════════════════════════════════════
+   RENDER — ABA EQUIPE
+══════════════════════════════════════════ */
+function renderEquipe() {
+  // Calcula quinzena com base no offset do navegador da aba Equipe
+  const refTs = (() => {
+    if (equipeQuinzenaOffset === 0) return Date.now();
+    let ts = Date.now();
+    for (let i = 0; i < Math.abs(equipeQuinzenaOffset); i++) {
+      const q = getQuinzena(ts);
+      ts = q.s.getTime() - 1;
+    }
+    return ts;
+  })();
+
+  const q       = getQuinzena(refTs);
+  const isAtual = equipeQuinzenaOffset === 0;
+
+  // Atualiza badge e botões do navegador
+  const badgeEl = document.getElementById('equipe-quinzena-badge');
+  if (badgeEl) badgeEl.textContent = q.label;
+
+  const navBtns = document.querySelectorAll('#dona-equipe .period-nav-btn');
+  navBtns.forEach((btn, i) => { if (i === 1) btn.disabled = isAtual; });
+
+  const el = document.getElementById('dona-equipe-list');
+
+  el.innerHTML = COLABS.map(key => {
+    const u     = USERS[key];
+    const myQ   = records.filter(r => r.user === key && inQuinzena(r.ts, q));
+
+    const brutoNormal = myQ.filter(r => r.type === 'ganho').reduce((s, r) => s + r.val, 0);
+    const brutoBronze = myQ.filter(r => r.type === 'bronze').reduce((s, r) => s + r.val, 0);
+    const vales       = myQ.filter(r => r.type === 'vale').reduce((s, r) => s + r.val, 0);
+    const sala        = brutoNormal * 0.3;
+    const liq         = (brutoNormal * 0.7) + brutoBronze - vales;
+
+    return `
+      <div class="colab-card">
+        <div class="colab-name">${escapeHtml(u.name)}</div>
+        <div class="colab-row"><span>Bruto quinzena</span><span>${escapeHtml(brl(brutoNormal + brutoBronze))}</span></div>
+        <div class="colab-row"><span>30% salão</span><span>${escapeHtml(brl(sala))}</span></div>
+        <div class="colab-row"><span>Vales descontados</span><span>- ${escapeHtml(brl(vales))}</span></div>
+        <div class="colab-row">
+          <span style="font-weight:500;color:var(--text)">A receber</span>
+          <span style="color:var(--success);font-size:14px">${escapeHtml(brl(Math.max(0, liq)))}</span>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+/* ══════════════════════════════════════════
+   RENDER — ABA DESPESAS
+══════════════════════════════════════════ */
+function renderDespesas() {
+  const el = document.getElementById('dona-desp-list');
+
+  if (!despesas.length) {
+    el.innerHTML = '<div class="empty-state">Nenhuma despesa registrada.</div>';
+    return;
+  }
+
+  // Agrupa despesas por mês
+  const map = new Map();
+  despesas.forEach(d => {
+    const dt  = new Date(d.ts);
+    const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
+    if (!map.has(key)) {
+      const label = dt.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+      map.set(key, {
+        key,
+        label: label.charAt(0).toUpperCase() + label.slice(1),
+        s: new Date(dt.getFullYear(), dt.getMonth(), 1),
+        items: [],
+      });
+    }
+    map.get(key).items.push(d);
+  });
+
+  const grupos = Array.from(map.values()).sort((a, b) => b.s - a.s);
+
+  const mesAtualKey = (() => {
+    const n = new Date();
+    return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`;
+  })();
+
+  el.innerHTML = grupos.map((g, idx) => {
+    const isAtual = g.key === mesAtualKey;
+    const isOpen  = isAtual || idx === 0;
+    const total   = g.items.reduce((s, d) => s + d.val, 0);
+
+    const itemsHtml = g.items.map(d => `
+      <div class="mov-item">
+        <div>
+          <div class="mov-desc">${escapeHtml(d.desc)}</div>
+          <div class="mov-meta">${escapeHtml(fmtFull(d.ts))}</div>
+          <div class="mov-action-btns">
+            <button class="edit-btn" data-action="open-edit-despesa" data-id="${escapeHtml(d.id)}">editar</button>
+            <button class="delete-btn" data-action="confirm-delete-despesa" data-id="${escapeHtml(d.id)}">excluir</button>
+          </div>
+        </div>
+        <div style="text-align:right">
+          <div class="mov-val neg">- ${escapeHtml(brl(d.val))}</div>
+        </div>
+      </div>`).join('');
+
+    return `
+      <div class="hist-group">
+        <button class="hist-group-header ${isOpen ? 'open' : ''}" data-action="toggle-hist">
+          <div class="hist-group-label">
+            <span class="hist-group-period">${escapeHtml(g.label)}</span>
+            ${isAtual ? '<span class="hist-badge-atual">atual</span>' : ''}
+          </div>
+          <div class="hist-group-summary">
+            <span class="hist-group-liq" style="color:var(--danger)">- ${escapeHtml(brl(total))}</span>
+            <span class="hist-group-arrow">${isOpen ? '▲' : '▼'}</span>
+          </div>
+        </button>
+        <div class="hist-group-body ${isOpen ? 'open' : ''}">
+          <div style="padding: 0 14px">${itemsHtml}</div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function addDespesa() {
+  if (!currentUser || currentUser.role !== 'dona') {
+    alert('Apenas a proprietária pode registrar despesas.');
+    return;
+  }
+
+  const desc = limitText(document.getElementById('d-desc').value, 120);
+  const val  = parseFloat(document.getElementById('d-valor').value);
+  if (!desc || isNaN(val) || val <= 0) { alert('Preencha a descrição e o valor.'); return; }
+
+  showLoading(true);
+  try {
+    const nova = await insertDespesa({ desc, val, ts: Date.now() });
+    despesas.unshift(nova);
+
+    document.getElementById('d-desc').value  = '';
+    document.getElementById('d-valor').value = '';
+
+    const msg = document.getElementById('desp-msg');
+    msg.textContent = 'Despesa registrada!';
+    setTimeout(() => msg.textContent = '', 2500);
+
+    renderDespesas();
+    renderDonaPainel();
+    renderCaixa();
+  } catch (err) {
+    console.error('Erro ao registrar despesa:', err);
+    alert('Erro ao salvar despesa. Tente novamente.');
+  } finally {
+    showLoading(false);
+  }
+}
+
+/* ══════════════════════════════════════════
+   RENDER — ABA CAIXA
+══════════════════════════════════════════ */
+function renderCaixa() {
+  renderHistoricoMensal();
+}
+
+function renderHistoricoMensal() {
+  const el     = document.getElementById('cx-hist-mensal');
+  const grupos = agruparPorMes(records, despesas);
+
+  if (!grupos.length) {
+    el.innerHTML = '<div class="empty-state">Nenhum dado ainda.</div>';
+    return;
+  }
+
+  const mesAtualKey = (() => {
+    const n = new Date();
+    return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}`;
+  })();
+
+  el.innerHTML = grupos.map((g, idx) => {
+    const isAtual = g.key === mesAtualKey;
+    const isOpen  = isAtual || idx === 0;
+
+    const trinta_normal = g.records
+      .filter(r => r.type === 'ganho')
+      .reduce((s, r) => s + r.val, 0) * 0.3;
+    const trinta_bronze = g.records
+      .filter(r => r.type === 'bronze')
+      .reduce((s, r) => s + (r.bronze_salao || 0), 0);
+    const sala30  = trinta_normal + trinta_bronze;
+    const despTot = g.despesas.reduce((s, d) => s + d.val, 0);
+    const liq     = sala30 - despTot;
+
+    return `
+      <div class="hist-group">
+        <button class="hist-group-header ${isOpen ? 'open' : ''}" data-action="toggle-hist">
+          <div class="hist-group-label">
+            <span class="hist-group-period">${escapeHtml(g.label)}</span>
+            ${isAtual ? '<span class="hist-badge-atual">atual</span>' : ''}
+          </div>
+          <div class="hist-group-summary">
+            <span class="hist-group-liq" style="color:${liq >= 0 ? 'var(--success)' : 'var(--danger)'}">${escapeHtml(brl(liq))}</span>
+            <span class="hist-group-arrow">${isOpen ? '▲' : '▼'}</span>
+          </div>
+        </button>
+        <div class="hist-group-body ${isOpen ? 'open' : ''}">
+          <div class="hist-group-totals hist-group-totals-mensal">
+            <div class="hist-mensal-row">
+              <span class="hist-mensal-label">30% salão</span>
+              <span class="hist-mensal-val pos">${escapeHtml(brl(sala30))}</span>
+            </div>
+            <div class="hist-mensal-row">
+              <span class="hist-mensal-label">Despesas</span>
+              <span class="hist-mensal-val neg">- ${escapeHtml(brl(despTot))}</span>
+            </div>
+            <div class="hist-mensal-row hist-mensal-total">
+              <span class="hist-mensal-label">Total líquido</span>
+              <span class="hist-mensal-val" style="color:${liq >= 0 ? 'var(--success)' : 'var(--danger)'}">${escapeHtml(brl(liq))}</span>
+            </div>
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+/* ══════════════════════════════════════════
+   EXCLUSÃO COM CONFIRMAÇÃO
+══════════════════════════════════════════ */
+
+function confirmDeleteRecord(id) {
+  deletingId   = Number(id);  // converte aqui na origem
+  deletingType = 'record';
+  const record = records.find(r => Number(r.id) === deletingId);
+  const desc = record?.desc || 'registro selecionado';
+  document.getElementById('confirm-delete-desc').textContent = `"${desc}"`;
+  document.getElementById('modal-confirm-delete').classList.add('open');
+}
+
+function confirmDeleteDespesa(id) {
+  deletingId   = Number(id);  // converte aqui na origem
+  deletingType = 'despesa';
+  const despesa = despesas.find(d => Number(d.id) === deletingId);
+  const desc = despesa?.desc || 'despesa selecionada';
+  document.getElementById('confirm-delete-desc').textContent = `"${desc}"`;
+  document.getElementById('modal-confirm-delete').classList.add('open');
+}
+
+function closeConfirmDelete() {
+  document.getElementById('modal-confirm-delete').classList.remove('open');
+  deletingId   = null;
+  deletingType = null;
+}
+
+async function executeDelete() {
+
+  if (!deletingId || !deletingType) return;
+
+  // salva os valores antes do close
+  const id = deletingId;
+  const type = deletingType;
+
+  // fecha modal sem perder referência
+  closeConfirmDelete();
+
+  showLoading(true);
+
+  try {
+
+    if (type === 'record') {
+
+      await deleteRecord(id);
+
+      records = records.filter(
+        r => Number(r.id) !== Number(id)
+      );
+
+      renderDonaPainel();
+      renderEquipe();
+      renderCaixa();
+
+    } else {
+
+      await deleteDespesa(id);
+
+      despesas = despesas.filter(
+        d => Number(d.id) !== Number(id)
+      );
+
+      renderDespesas();
+      renderDonaPainel();
+      renderCaixa();
+    }
+
+  } catch (err) {
+
+    const msg =
+      err?.message ||
+      err?.details ||
+      JSON.stringify(err) ||
+      'Erro desconhecido';
+
+    console.error('Erro ao excluir:', msg, err);
+
+    alert('Erro ao excluir:\n' + msg);
+
+  } finally {
+
+    showLoading(false);
+  }
+}
+
+/* ══════════════════════════════════════════
+   MODAL DE EDIÇÃO (proprietária)
+══════════════════════════════════════════ */
+function openEdit(id) {
+  if (!currentUser || currentUser.role !== 'dona') return;
+  const r = records.find(
+  x => String(x.id) === String(id)
+);
+  if (!r) return;
+  editingId = Number(id);
+
+  const isBronze = r.type === 'bronze';
+
+  document.getElementById('modal-title').textContent =
+    r.type === 'ganho' ? 'Editar — Ganho' :
+    r.type === 'bronze' ? 'Editar — Bronze' : 'Editar — Vale';
+
+  document.getElementById('m-desc').value = r.cliente || r.desc;
+  document.getElementById('m-data').value = tsToDateInput(r.ts);
+
+  // Alterna campos conforme tipo
+  document.getElementById('m-val-group').style.display        = isBronze ? 'none' : 'block';
+  document.getElementById('m-val-bronze-group').style.display = isBronze ? 'block' : 'none';
+
+  if (isBronze) {
+    // Mostra o valor TOTAL (colaboradora R$10 + salão)
+    const total = r.val + (r.bronze_salao || 0);
+    document.getElementById('m-val-bronze').value = total;
+    previewEditBronze();
+  } else {
+    document.getElementById('m-val').value = r.val;
+    document.getElementById('m-bronze-preview').style.display = 'none';
+  }
+
+  document.getElementById('modal-edit').classList.add('open');
+}
+
+function previewEditBronze() {
+  const total = parseFloat(document.getElementById('m-val-bronze').value);
+  const prev  = document.getElementById('m-bronze-preview');
+  if (!isNaN(total) && total > 10) {
+    prev.style.display = 'flex';
+    document.getElementById('m-bp-colab').textContent = brl(10);
+    document.getElementById('m-bp-salao').textContent = brl(total - 10);
+  } else {
+    prev.style.display = 'none';
+  }
+}
+
+function closeModal() {
+  document.getElementById('modal-edit').classList.remove('open');
+  editingId = null;
+}
+
+async function saveEdit() {
+  requireDona();
+  const r       = records.find(x => Number(x.id) === Number(editingId));
+  if (!r) return;
+  const isBronze = r.type === 'bronze';
+  const newDesc  = limitText(document.getElementById('m-desc').value, 120);
+  const newData  = document.getElementById('m-data').value;
+  if (!newDesc) { alert('Preencha a descrição.'); return; }
+  if (!newData)  { alert('Informe a data do registro.'); return; }
+
+  if (isBronze) {
+    // Para bronze: lê o valor TOTAL e recalcula a divisão
+    const total = parseFloat(document.getElementById('m-val-bronze').value);
+    if (isNaN(total) || total <= 10) {
+      alert('O valor total do bronze deve ser maior que R$ 10,00.');
+      return;
+    }
+    r.val          = 10;          // colaboradora sempre R$10
+    r.bronze_salao = total - 10;  // excedente para o salão
+    r.cliente      = newDesc;
+    r.desc         = 'Bronze — ' + newDesc;
+  } else {
+    const newVal = parseFloat(document.getElementById('m-val').value);
+    if (isNaN(newVal) || newVal <= 0) { alert('Informe um valor válido.'); return; }
+    r.val = newVal;
+    if (r.type === 'ganho') {
+      r.cliente = newDesc;
+      r.desc    = 'Atendimento — ' + newDesc;
+    } else {
+      r.desc = newDesc;
+    }
+  }
+
+  r.ts = dateInputToTs(newData);
+
+  showLoading(true);
+  try {
+    await updateRecord(r);
+    closeModal();
+    renderEquipe();
+    renderDonaPainel();
+    renderCaixa();
+  } catch (err) {
+    console.error('Erro ao editar:', err);
+    alert('Erro ao salvar edição. Tente novamente.');
+  } finally {
+    showLoading(false);
+  }
+}
+
+/* ══════════════════════════════════════════
+   MODAL DE EDIÇÃO DE DESPESA (proprietária)
+══════════════════════════════════════════ */
+function openEditDespesa(id) {
+  if (!currentUser || currentUser.role !== 'dona') return;
+  const d = despesas.find(x => Number(x.id) === Number(id));
+  if (!d) return;
+  editingDespesaId = Number(id);
+  document.getElementById('md-desc').value = d.desc;
+  document.getElementById('md-val').value  = d.val;
+  document.getElementById('md-data').value = tsToDateInput(d.ts);
+  document.getElementById('modal-despesa').classList.add('open');
+}
+
+function closeModalDespesa() {
+  document.getElementById('modal-despesa').classList.remove('open');
+  editingDespesaId = null;
+}
+
+async function saveEditDespesa() {
+  requireDona();
+  const d      = despesas.find(x => Number(x.id) === Number(editingDespesaId));
+  if (!d) return;
+  const newVal  = parseFloat(document.getElementById('md-val').value);
+  const newDesc = limitText(document.getElementById('md-desc').value, 120);
+  const newData = document.getElementById('md-data').value;
+  if (!newDesc || isNaN(newVal) || newVal <= 0) { alert('Preencha todos os campos.'); return; }
+  if (!newData) { alert('Informe a data.'); return; }
+
+  d.desc = newDesc;
+  d.val  = newVal;
+  d.ts   = dateInputToTs(newData);
+
+  showLoading(true);
+  try {
+    await updateDespesa(d);
+    closeModalDespesa();
+    renderDespesas();
+    renderDonaPainel();
+    renderCaixa();
+  } catch (err) {
+    console.error('Erro ao editar despesa:', err);
+    alert('Erro ao salvar. Tente novamente.');
+  } finally {
+    showLoading(false);
+  }
+}
+
+function handleAction(action, target) {
+  if (!action) return;
+
+  const id = target.dataset.id;
+  const screen = target.dataset.screen;
+  const tab = target.dataset.tab;
+  const dir = Number(target.dataset.dir || 0);
+  const tipo = target.dataset.tipo;
+
+  const actions = {
+    login: doLogin,
+    logout,
+    switchTab: () => switchTab(screen, tab),
+    colabNav: () => colabNavQuinzena(dir),
+    equipeNav: () => equipeNavQuinzena(dir),
+    donaNav: () => donaNavMes(dir),
+    setTipo: () => setTipo(tipo),
+    registrar,
+    addDespesa,
+    closeModal,
+    saveEdit,
+    closeModalDespesa,
+    saveEditDespesa,
+    closeConfirmDelete,
+    executeDelete,
+    'toggle-hist': () => toggleHistGroup(target),
+    'open-edit': () => openEdit(id),
+    'confirm-delete-record': () => confirmDeleteRecord(id),
+    'open-edit-despesa': () => openEditDespesa(Number(id)),
+    'confirm-delete-despesa': () => confirmDeleteDespesa(Number(id)),
+  };
+
+  actions[action]?.();
+}
+
+function bindEvents() {
+  document.addEventListener('click', event => {
+    const target = event.target.closest('[data-action]');
+    if (!target) return;
+    event.preventDefault();
+    handleAction(target.dataset.action, target);
+  });
+
+  const loginPass = document.getElementById('login-pass');
+  if (loginPass) {
+    loginPass.addEventListener('keydown', event => {
+      if (event.key === 'Enter') doLogin();
+    });
+  }
+
+  const bronzeInput = document.getElementById('r-valor-b');
+  if (bronzeInput) bronzeInput.addEventListener('input', previewBronze);
+
+  const editBronzeInput = document.getElementById('m-val-bronze');
+  if (editBronzeInput) editBronzeInput.addEventListener('input', previewEditBronze);
+}
+
+async function initAuth() {
+  showLoading(true);
+  try {
+    const { data: { session } } = await db.auth.getSession();
+    if (!session) {
+      showScreen('s-login');
+      return;
+    }
+
+    await loadProfile();
+    await enterApp();
+  } catch (err) {
+    await db.auth.signOut();
+    currentUser = null;
+    showScreen('s-login');
+  } finally {
+    showLoading(false);
+  }
+}
+
+bindEvents();
+initAuth();

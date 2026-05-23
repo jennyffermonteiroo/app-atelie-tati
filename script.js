@@ -350,7 +350,7 @@ async function loadAll() {
     caixaFechamentos = [];
   } catch (err) {
     console.error('Erro ao carregar dados:', err);
-    alert('Erro ao conectar com o banco de dados. Verifique a URL e a chave do Supabase.');
+    showToast('Erro ao carregar dados. Verifique sua conexão.', 'erro');
   } finally {
     showLoading(false);
   }
@@ -620,7 +620,7 @@ function previewBronze() {
 ══════════════════════════════════════════ */
 async function registrar() {
   if (!currentUser || currentUser.role !== 'colab') {
-    alert('Apenas colaboradoras podem registrar movimentações.');
+    showToast('Apenas colaboradoras podem registrar movimentações.', 'erro'); return;
     return;
   }
 
@@ -631,7 +631,7 @@ async function registrar() {
     cliente = limitText(document.getElementById('r-cliente').value, 80);
     desc    = 'Atendimento' + (cliente ? ' — ' + cliente : '');
     if (!cliente || isNaN(val) || val <= 0) {
-      alert('Preencha o nome da cliente e o valor.');
+      showToast('Preencha o nome da cliente e o valor.', 'erro');
       return;
     }
 
@@ -639,7 +639,7 @@ async function registrar() {
     val  = parseFloat(document.getElementById('r-valor-v').value);
     desc = limitText(document.getElementById('r-desc-v').value, 120);
     if (!desc || isNaN(val) || val <= 0) {
-      alert('Preencha a descrição e o valor.');
+      showToast('Preencha a descrição e o valor.', 'erro');
       return;
     }
 
@@ -647,7 +647,7 @@ async function registrar() {
     const total = parseFloat(document.getElementById('r-valor-b').value);
     cliente     = limitText(document.getElementById('r-cliente-b').value, 80);
     if (!cliente || isNaN(total) || total <= 10) {
-      alert('Preencha o nome da cliente e um valor maior que R$ 10,00.');
+      showToast('Preencha o nome da cliente e um valor maior que R$ 10,00.', 'erro');
       return;
     }
     val          = 10;           // colaboradora recebe R$10 fixo, sem desconto de 30%
@@ -687,7 +687,7 @@ async function registrar() {
     renderColab();
   } catch (err) {
     console.error('Erro ao registrar:', err);
-    alert('Erro ao salvar. Tente novamente.');
+    showToast('Erro ao salvar. Tente novamente.', 'erro');
   } finally {
     showLoading(false);
   }
@@ -1077,13 +1077,13 @@ function renderDespesas() {
 
 async function addDespesa() {
   if (!currentUser || currentUser.role !== 'dona') {
-    alert('Apenas a proprietária pode registrar despesas.');
+    showToast('Apenas a proprietária pode registrar despesas.', 'erro'); return;
     return;
   }
 
   const desc = limitText(document.getElementById('d-desc').value, 120);
   const val  = parseFloat(document.getElementById('d-valor').value);
-  if (!desc || isNaN(val) || val <= 0) { alert('Preencha a descrição e o valor.'); return; }
+  if (!desc || isNaN(val) || val <= 0) { showToast('Preencha a descrição e o valor.', 'erro'); return; }
 
   showLoading(true);
   try {
@@ -1102,7 +1102,7 @@ async function addDespesa() {
     renderCaixa();
   } catch (err) {
     console.error('Erro ao registrar despesa:', err);
-    alert('Erro ao salvar despesa. Tente novamente.');
+    showToast('Erro ao salvar despesa. Tente novamente.', 'erro');
   } finally {
     showLoading(false);
   }
@@ -1253,7 +1253,7 @@ async function executeDelete() {
 
     console.error('Erro ao excluir:', msg, err);
 
-    alert('Erro ao excluir:\n' + msg);
+    showToast('Erro ao excluir. Tente novamente.', 'erro');
 
   } finally {
 
@@ -1322,14 +1322,14 @@ async function saveEdit() {
   const isBronze = r.type === 'bronze';
   const newDesc  = limitText(document.getElementById('m-desc').value, 120);
   const newData  = document.getElementById('m-data').value;
-  if (!newDesc) { alert('Preencha a descrição.'); return; }
-  if (!newData)  { alert('Informe a data do registro.'); return; }
+  if (!newDesc) { showToast('Preencha a descrição.', 'erro'); return; }
+  if (!newData) { showToast('Informe a data do registro.', 'erro'); return; }
 
   if (isBronze) {
     // Para bronze: lê o valor TOTAL e recalcula a divisão
     const total = parseFloat(document.getElementById('m-val-bronze').value);
     if (isNaN(total) || total <= 10) {
-      alert('O valor total do bronze deve ser maior que R$ 10,00.');
+      showToast('O valor total do bronze deve ser maior que R$ 10,00.', 'erro');
       return;
     }
     r.val          = 10;          // colaboradora sempre R$10
@@ -1338,7 +1338,7 @@ async function saveEdit() {
     r.desc         = 'Bronze — ' + newDesc;
   } else {
     const newVal = parseFloat(document.getElementById('m-val').value);
-    if (isNaN(newVal) || newVal <= 0) { alert('Informe um valor válido.'); return; }
+    if (isNaN(newVal) || newVal <= 0) { showToast('Informe um valor válido.', 'erro'); return; }
     r.val = newVal;
     if (r.type === 'ganho') {
       r.cliente = newDesc;
@@ -1359,7 +1359,7 @@ async function saveEdit() {
     renderCaixa();
   } catch (err) {
     console.error('Erro ao editar:', err);
-    alert('Erro ao salvar edição. Tente novamente.');
+    showToast('Erro ao salvar edição. Tente novamente.', 'erro');
   } finally {
     showLoading(false);
   }
@@ -1391,8 +1391,8 @@ async function saveEditDespesa() {
   const newVal  = parseFloat(document.getElementById('md-val').value);
   const newDesc = limitText(document.getElementById('md-desc').value, 120);
   const newData = document.getElementById('md-data').value;
-  if (!newDesc || isNaN(newVal) || newVal <= 0) { alert('Preencha todos os campos.'); return; }
-  if (!newData) { alert('Informe a data.'); return; }
+  if (!newDesc || isNaN(newVal) || newVal <= 0) { showToast('Preencha todos os campos.', 'erro'); return; }
+  if (!newData) { showToast('Informe a data.', 'erro'); return; }
 
   d.desc = newDesc;
   d.val  = newVal;
@@ -1407,7 +1407,7 @@ async function saveEditDespesa() {
     renderCaixa();
   } catch (err) {
     console.error('Erro ao editar despesa:', err);
-    alert('Erro ao salvar. Tente novamente.');
+    showToast('Erro ao salvar. Tente novamente.', 'erro');
   } finally {
     showLoading(false);
   }
