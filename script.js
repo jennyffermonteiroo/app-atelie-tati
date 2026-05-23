@@ -8,8 +8,8 @@
    A chave anon pode ficar no cliente somente com RLS ativo.
    Nunca use a service_role key no frontend.
 ══════════════════════════════════════════ */
-const SUPABASE_URL = 'https://ibvoffzemhvvgyygadsk.supabase.co';
-const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlidm9mZnplbWh2dmd5eWdhZHNrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5MTU4MDcsImV4cCI6MjA5MTQ5MTgwN30.nBd_2vQsBbdBfDMUGT15AmM7wlK2hTZcSdE_6bZiuqI';
+const SUPABASE_URL = window.__ENV?.SUPABASE_URL || '';
+const SUPABASE_ANON = window.__ENV?.SUPABASE_ANON_KEY || '';
 
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON, {
   auth: {
