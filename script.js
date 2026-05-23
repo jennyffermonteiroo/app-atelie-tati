@@ -32,6 +32,12 @@ const USERS = {
   salao:   { name: 'Salão',   email: 'salao@atelietatibrandao.app',   role: 'dona'  },
 };
 
+// Controle de tentativas de login
+let loginAttempts = 0;
+let loginBlockedUntil = 0;
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOGIN_BLOCK_MS = 30 * 60 * 1000; // 30 minutos
+
 const COLABS = ['fabiola', 'kaylane', 'tati'];
 
 let currentUser      = null;
@@ -479,6 +485,13 @@ async function doLogin() {
   const pass = document.getElementById('login-pass').value;
   const err  = document.getElementById('login-err');
 
+  // Verifica bloqueio ativo
+  if (Date.now() < loginBlockedUntil) {
+    const min = Math.ceil((loginBlockedUntil - Date.now()) / 60000);
+    err.textContent = `Muitas tentativas. Tente novamente em ${min} minuto(s).`;
+    return;
+  }
+
   if (!key) { err.textContent = 'Selecione um perfil.'; return; }
   if (!pass) { err.textContent = 'Informe a senha.'; return; }
 
@@ -489,7 +502,6 @@ async function doLogin() {
       email: user.email,
       password: pass,
     });
-
     if (error) throw error;
 
     await loadProfile();
@@ -498,12 +510,24 @@ async function doLogin() {
       throw new Error('Este login não pertence ao perfil selecionado.');
     }
 
+    // Login ok — zera tentativas
+    loginAttempts = 0;
+    loginBlockedUntil = 0;
     err.textContent = '';
     document.getElementById('login-pass').value = '';
     await enterApp();
+
   } catch (loginError) {
+    loginAttempts++;
+    if (loginAttempts >= MAX_LOGIN_ATTEMPTS) {
+      loginBlockedUntil = Date.now() + LOGIN_BLOCK_MS;
+      loginAttempts = 0;
+      err.textContent = 'Muitas tentativas incorretas. Aguarde 30 minutos.';
+    } else {
+      const restantes = MAX_LOGIN_ATTEMPTS - loginAttempts;
+      err.textContent = `Senha incorreta. ${restantes} tentativa(s) restante(s).`;
+    }
     currentUser = null;
-    err.textContent = 'Login inválido ou perfil sem permissão.';
   } finally {
     showLoading(false);
   }
