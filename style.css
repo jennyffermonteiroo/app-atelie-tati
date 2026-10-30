@@ -1,6 +1,6 @@
 /* ══════════════════════════════════════════
    SALÃO — Gestão Financeira
-   style.css
+   style.css — visual preto, branco e dourado
 ══════════════════════════════════════════ */
 
 @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@400;500&display=swap');
@@ -11,26 +11,34 @@
   padding: 0;
 }
 
-/* ── VARIÁVEIS ── */
+/* ── VARIÁVEIS ──
+   --text, --success e --danger também são usadas pelo script.js */
 :root {
-  --rose:       #0222d7;
-  --rose-light: #a4b5ed;
-  --rose-mid:   #a0cae8;
-  --gold:       #b8860b;
-  --gold-light: #fdf3dc;
-  --text:       #1a1a1a;
-  --muted:      #888;
-  --border:     #e8e0e4;
-  --bg:         #ffffff;
-  --bg2:        #f7f9fa;
-  --danger:     #c0392b;
-  --success:    #2d7a4f;
+  --ink:         #0e0e0e;  /* preto principal */
+  --ink-soft:    #2a2a2a;
+  --gold:        #b8913a;  /* dourado — detalhes */
+  --gold-soft:   #d9bf7f;  /* dourado claro sobre preto */
+  --gold-dark:   #8a6a24;  /* dourado para texto sobre claro */
+  --gold-light:  #faf5e8;
+  --gold-border: #e7d6a8;
+  --navy:        #1b2a4a;  /* azul marinho — detalhes mínimos */
+  --text:        #111111;
+  --muted:       #7a7a7a;
+  --border:      #e6e3dc;
+  --bg:          #ffffff;
+  --bg2:         #fafaf8;
+  --page:        #f2f0eb;
+  --pill:        #efede8;
+  --danger:      #a33a2d;
+  --danger-soft: #fbefed;
+  --success:     #3d7a52;
 }
 
 /* ── BASE ── */
 body {
   font-family: 'DM Sans', sans-serif;
-  background: #f3eef0;
+  background: var(--page);
+  color: var(--text);
   min-height: 100vh;
   display: flex;
   align-items: flex-start;
@@ -42,13 +50,15 @@ body {
   position: relative;
   width: 100%;
   max-width: 420px;
-  background: var(--bg);
+  background: var(--bg2);
   border: 0.5px solid var(--border);
-  border-radius: 20px;
+  border-radius: 24px;
   overflow: hidden;
-  box-shadow: 0 4px 32px rgba(192, 82, 110, 0.08);
+  box-shadow: 0 8px 40px rgba(14, 14, 14, 0.08);
   min-height: 600px;
 }
+
+button { -webkit-tap-highlight-color: transparent; }
 
 /* ══════════════════════════════════════════
    SCREENS
@@ -71,30 +81,50 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 2rem 1.5rem;
-  background: var(--bg);
+  padding: 2rem 1.25rem;
+  background: var(--ink);
 }
 
 .login-logo {
   font-family: 'DM Serif Display', serif;
-  font-size: 36px;
-  color: var(--rose);
-  letter-spacing: -0.5px;
-  margin-bottom: 4px;
+  font-size: 34px;
+  line-height: 1.15;
+  color: #fff;
+  text-align: center;
+  letter-spacing: -0.3px;
+  margin-bottom: 10px;
+}
+.login-logo::before {
+  content: '✦';
+  display: block;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 16px;
+  color: var(--gold);
+  margin-bottom: 8px;
 }
 
 .login-sub {
-  font-size: 13px;
-  color: var(--muted);
+  font-size: 12px;
+  color: #a8a8a8;
+  letter-spacing: .08em;
   margin-bottom: 2rem;
+  text-align: center;
+}
+.login-sub::before {
+  content: '';
+  display: block;
+  width: 32px;
+  height: 1px;
+  background: var(--gold);
+  margin: 0 auto 12px;
 }
 
 .login-card {
   width: 100%;
-  max-width: 320px;
+  max-width: 340px;
   background: var(--bg2);
-  border: 0.5px solid var(--border);
-  border-radius: 16px;
+  border: none;
+  border-radius: 20px;
   padding: 1.5rem;
 }
 
@@ -114,7 +144,7 @@ body {
   width: 100%;
   padding: 9px 12px;
   border: 0.5px solid var(--border);
-  border-radius: 8px;
+  border-radius: 12px;
   font-size: 14px;
   color: var(--text);
   background: var(--bg);
@@ -123,17 +153,18 @@ body {
 }
 .login-card input:focus,
 .login-card select:focus {
-  border-color: var(--rose-mid);
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(184, 145, 58, .15);
 }
 
 .login-btn {
   width: 100%;
-  margin-top: 1rem;
+  margin-top: 1.25rem;
   padding: 11px;
-  background: var(--rose);
-  color: #fff;
+  background: var(--gold);
+  color: var(--ink);
   border: none;
-  border-radius: 8px;
+  border-radius: 999px;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -141,7 +172,7 @@ body {
   transition: background .15s;
 }
 .login-btn:hover {
-  background: #419ca8;
+  background: var(--gold-soft);
 }
 
 .login-err {
@@ -159,20 +190,27 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 16px;
-  border-bottom: 0.5px solid var(--border);
-  background: var(--bg);
+  padding: 16px 16px 6px;
+  background: var(--bg2);
 }
 
 .topbar-title {
   font-family: 'DM Serif Display', serif;
-  font-size: 20px;
-  color: var(--rose);
+  font-size: 17px;
+  color: var(--text);
+}
+.topbar-title::first-letter {
+  color: var(--gold);
 }
 
+/* Nome de quem está logado — em destaque abaixo do topo */
 .topbar-user {
-  font-size: 12px;
-  color: var(--muted);
+  display: block;
+  padding: 2px 16px 10px;
+  font-size: 20px;
+  font-weight: 500;
+  color: var(--text);
+  background: var(--bg2);
 }
 
 .topbar-right {
@@ -182,26 +220,30 @@ body {
 }
 
 .topbar-out {
-  background: none;
+  background: var(--bg);
   border: 0.5px solid var(--border);
-  border-radius: 6px;
-  padding: 4px 10px;
+  border-radius: 999px;
+  padding: 5px 12px;
   font-size: 12px;
   color: var(--muted);
   cursor: pointer;
   font-family: 'DM Sans', sans-serif;
 }
 .topbar-out:hover {
-  background: var(--bg2);
+  color: var(--text);
+  border-color: var(--ink);
 }
 
 /* ══════════════════════════════════════════
-   NAV
+   NAV — abas em pílula
 ══════════════════════════════════════════ */
 .nav {
   display: flex;
-  border-bottom: 0.5px solid var(--border);
-  background: var(--bg);
+  gap: 4px;
+  margin: 0 16px 4px;
+  padding: 4px;
+  background: var(--pill);
+  border-radius: 999px;
 }
 
 .nav-btn {
@@ -212,14 +254,14 @@ body {
   color: var(--muted);
   background: none;
   border: none;
-  border-bottom: 2px solid transparent;
+  border-radius: 999px;
   cursor: pointer;
   font-family: 'DM Sans', sans-serif;
-  transition: color .15s;
+  transition: background .15s, color .15s;
 }
 .nav-btn.active {
-  color: var(--rose);
-  border-bottom-color: var(--rose);
+  background: var(--ink);
+  color: #fff;
 }
 
 /* ══════════════════════════════════════════
@@ -252,7 +294,7 @@ body {
 .card {
   background: var(--bg);
   border: 0.5px solid var(--border);
-  border-radius: 12px;
+  border-radius: 16px;
   padding: 12px 14px;
 }
 
@@ -272,25 +314,53 @@ body {
   color: var(--text);
 }
 .card-val.green { color: var(--success); }
-.card-val.rose  { color: var(--rose); }
+.card-val.rose  { color: var(--text); }
+
+/* Card de destaque preto (estilo do banner):
+   colaboradora → "Saldo líquido hoje"; proprietária → "Total líquido salão" */
+.card:has(#c-saldo-dia),
+.card:has(#d-liq-salao) {
+  grid-column: 1 / -1;
+  order: -1;
+  background: var(--ink);
+  border: none;
+  border-bottom: 3px solid var(--gold);
+  border-radius: 20px;
+  padding: 16px 18px;
+}
+.card:has(#c-saldo-dia) .card-label,
+.card:has(#d-liq-salao) .card-label {
+  color: var(--gold-soft);
+  font-size: 12px;
+}
+.card:has(#c-saldo-dia) .card-val,
+.card:has(#d-liq-salao) .card-val {
+  color: #fff;
+  font-size: 28px;
+}
+/* "Ganhos brutos" passa a dividir a linha com "Saldo a receber" */
+.card:has(#c-bruto) {
+  grid-column: auto;
+}
 
 /* ── LABELS / BADGES ── */
 .section-head {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
-  color: var(--muted);
-  margin: 1rem 0 6px;
+  color: var(--navy);
+  margin: 1.25rem 2px 8px;
   text-transform: uppercase;
-  letter-spacing: .04em;
+  letter-spacing: .08em;
 }
 
 .quinzena-badge {
   display: inline-block;
-  font-size: 11px;
-  background: var(--rose-light);
-  color: var(--rose);
-  padding: 3px 10px;
-  border-radius: 20px;
+  font-size: 12px;
+  background: var(--bg);
+  color: var(--gold-dark);
+  border: 0.5px solid var(--gold-border);
+  padding: 5px 12px;
+  border-radius: 999px;
   margin-bottom: 12px;
 }
 
@@ -301,7 +371,8 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  padding: 10px 0;
+  gap: 10px;
+  padding: 12px 0;
   border-bottom: 0.5px solid var(--border);
 }
 .mov-item:last-child {
@@ -309,7 +380,7 @@ body {
 }
 
 .mov-desc {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text);
 }
 
@@ -320,17 +391,18 @@ body {
 }
 
 .mov-val {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   text-align: right;
+  white-space: nowrap;
 }
 .mov-val.pos { color: var(--success); }
 .mov-val.neg { color: var(--danger); }
 
 .mov-type {
-  font-size: 10px;
+  font-size: 11px;
   text-align: right;
-  color: var(--muted);
+  color: var(--gold-dark);
 }
 
 .empty-state {
@@ -344,7 +416,7 @@ body {
    FORMULÁRIOS
 ══════════════════════════════════════════ */
 .form-group {
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 .form-group label {
@@ -360,7 +432,7 @@ body {
   width: 100%;
   padding: 9px 12px;
   border: 0.5px solid var(--border);
-  border-radius: 8px;
+  border-radius: 12px;
   font-size: 14px;
   color: var(--text);
   background: var(--bg);
@@ -369,20 +441,21 @@ body {
 }
 .form-group input:focus,
 .form-group select:focus {
-  border-color: var(--rose-mid);
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px rgba(184, 145, 58, .15);
 }
 
 .toggle-row {
   display: flex;
   gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 .toggle-btn {
   flex: 1;
   padding: 9px;
   border: 0.5px solid var(--border);
-  border-radius: 8px;
+  border-radius: 12px;
   background: var(--bg);
   font-size: 13px;
   font-weight: 500;
@@ -392,27 +465,27 @@ body {
   transition: all .15s;
 }
 .toggle-btn.active {
-  background: var(--rose-light);
-  color: var(--rose);
-  border-color: var(--rose-mid);
+  background: var(--ink);
+  color: var(--gold-soft);
+  border-color: var(--ink);
 }
 
 .submit-btn {
   width: 100%;
   padding: 11px;
-  background: var(--rose);
+  background: var(--ink);
   color: #fff;
   border: none;
-  border-radius: 8px;
+  border-radius: 999px;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  margin-top: 4px;
+  margin-top: 6px;
   font-family: 'DM Sans', sans-serif;
   transition: background .15s;
 }
 .submit-btn:hover {
-  background: #a8415c;
+  background: var(--ink-soft);
 }
 
 .success-msg {
@@ -429,16 +502,28 @@ body {
 .colab-card {
   background: var(--bg);
   border: 0.5px solid var(--border);
-  border-radius: 12px;
-  padding: 12px 14px;
+  border-radius: 16px;
+  padding: 14px 16px;
   margin-bottom: 10px;
 }
 
 .colab-name {
-  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 15px;
   font-weight: 500;
   color: var(--text);
-  margin-bottom: 8px;
+  margin-bottom: 10px;
+}
+/* Ponto dourado antes do nome da colaboradora */
+.colab-name::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--gold);
+  flex-shrink: 0;
 }
 
 .colab-row {
@@ -446,26 +531,32 @@ body {
   justify-content: space-between;
   font-size: 12px;
   color: var(--muted);
-  margin-bottom: 3px;
+  margin-bottom: 5px;
 }
 .colab-row span:last-child {
   color: var(--text);
   font-weight: 500;
+}
+.colab-row:last-child {
+  border-top: 0.5px solid var(--gold-border);
+  padding-top: 8px;
+  margin-top: 6px;
+  margin-bottom: 0;
 }
 
 .edit-btn {
   font-size: 11px;
   padding: 3px 10px;
   border: 0.5px solid var(--border);
-  border-radius: 6px;
+  border-radius: 999px;
   background: none;
-  color: var(--muted);
+  color: var(--navy);
   cursor: pointer;
   font-family: 'DM Sans', sans-serif;
 }
 .edit-btn:hover {
   background: var(--bg2);
-  color: var(--rose);
+  border-color: var(--navy);
 }
 
 /* ══════════════════════════════════════════
@@ -473,31 +564,31 @@ body {
 ══════════════════════════════════════════ */
 .caixa-card {
   background: var(--gold-light);
-  border: 0.5px solid #e8d9a0;
-  border-radius: 12px;
+  border: 0.5px solid var(--gold-border);
+  border-radius: 16px;
   padding: 14px 16px;
   margin-bottom: 12px;
 }
 
 .caixa-label {
   font-size: 11px;
-  color: var(--gold);
+  color: var(--gold-dark);
   margin-bottom: 4px;
 }
 
 .caixa-val {
   font-size: 28px;
   font-weight: 500;
-  color: var(--gold);
+  color: var(--gold-dark);
 }
 
 .fechar-btn {
   width: 100%;
   padding: 11px;
   background: var(--gold);
-  color: #fff;
+  color: var(--ink);
   border: none;
-  border-radius: 8px;
+  border-radius: 999px;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -514,7 +605,7 @@ body {
   display: none;
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, .4);
+  background: rgba(14, 14, 14, .55);
   z-index: 200;
   align-items: flex-start;
   justify-content: center;
@@ -527,16 +618,17 @@ body {
 }
 
 .modal {
-  background: var(--bg);
-  border-radius: 16px;
+  background: var(--bg2);
+  border-radius: 20px;
+  border-top: 3px solid var(--gold);
   padding: 1.25rem;
   width: 90%;
-  max-width: 340px;
+  max-width: 360px;
   margin-bottom: 20px; /* espaço no final em telas pequenas */
 }
 
 .modal-title {
-  font-size: 15px;
+  font-size: 17px;
   font-weight: 500;
   color: var(--text);
   margin-bottom: 1rem;
@@ -545,40 +637,40 @@ body {
 .modal-section-label {
   font-size: 11px;
   font-weight: 500;
-  color: var(--muted);
+  color: var(--navy);
   text-transform: uppercase;
-  letter-spacing: .04em;
-  margin-bottom: 6px;
+  letter-spacing: .08em;
+  margin-bottom: 4px;
 }
 
 .modal-actions {
   display: flex;
   gap: 8px;
-  margin-top: 12px;
+  margin-top: 14px;
 }
 .modal-actions button {
   flex: 1;
-  padding: 9px;
-  border-radius: 8px;
+  padding: 11px;
+  border-radius: 999px;
   font-size: 13px;
   cursor: pointer;
   font-family: 'DM Sans', sans-serif;
 }
 
 .btn-cancel {
-  background: none;
+  background: var(--bg);
   border: 0.5px solid var(--border);
   color: var(--muted);
 }
 
 .btn-save {
-  background: var(--rose);
+  background: var(--ink);
   border: none;
   color: #fff;
   font-weight: 500;
 }
 .btn-save:hover {
-  background: #419ca8;
+  background: var(--ink-soft);
 }
 
 /* ══════════════════════════════════════════
@@ -588,7 +680,7 @@ body {
 .hist-group {
   background: var(--bg);
   border: 0.5px solid var(--border);
-  border-radius: 12px;
+  border-radius: 16px;
   margin-bottom: 10px;
   overflow: hidden;
 }
@@ -598,7 +690,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 14px;
+  padding: 14px 16px;
   background: none;
   border: none;
   cursor: pointer;
@@ -623,10 +715,10 @@ body {
 
 .hist-badge-atual {
   font-size: 10px;
-  background: var(--rose-light);
-  color: var(--rose);
+  background: var(--ink);
+  color: var(--gold-soft);
   padding: 2px 8px;
-  border-radius: 20px;
+  border-radius: 999px;
   font-weight: 500;
 }
 
@@ -645,7 +737,7 @@ body {
 
 .hist-group-arrow {
   font-size: 10px;
-  color: var(--muted);
+  color: var(--navy);
 }
 
 /* Corpo do accordion — fechado por padrão */
@@ -660,11 +752,11 @@ body {
 .hist-group-totals {
   display: flex;
   gap: 12px;
-  padding: 8px 14px;
-  background: var(--bg2);
-  border-bottom: 0.5px solid var(--border);
+  padding: 8px 16px;
+  background: var(--gold-light);
+  border-bottom: 0.5px solid var(--gold-border);
   font-size: 11px;
-  color: var(--muted);
+  color: var(--gold-dark);
   flex-wrap: wrap;
 }
 .hist-group-totals span {
@@ -680,6 +772,8 @@ html, body {
   height: 100%;
   overflow: hidden;
 }
+
+body { padding: 0; }
 
 #app {
   max-width: 100%;
@@ -712,7 +806,7 @@ html, body {
 
 /* Botões maiores para toque */
 .nav-btn {
-  padding: 12px 4px;
+  padding: 10px 4px;
   font-size: 13px;
 }
 
@@ -745,6 +839,23 @@ html, body {
 
 /* Card de métricas menor no mobile */
 .card-val { font-size: 20px; }
+.card:has(#c-saldo-dia) .card-val,
+.card:has(#d-liq-salao) .card-val { font-size: 28px; }
+
+/* Modais de edição abrem de baixo para cima no celular */
+.modal-bg:not(#modal-confirm-delete) {
+  align-items: flex-end;
+  padding-top: 0;
+}
+.modal-bg:not(#modal-confirm-delete) .modal {
+  width: 100%;
+  max-width: none;
+  margin-bottom: 0;
+  border-radius: 24px 24px 0 0;
+  max-height: 92dvh;
+  overflow-y: auto;
+  padding-bottom: calc(1.25rem + env(safe-area-inset-bottom));
+}
 
 /* ══════════════════════════════════════════
    LOADING OVERLAY
@@ -753,7 +864,7 @@ html, body {
   display: none;
   position: fixed;
   inset: 0;
-  background: rgba(255,255,255,0.88);
+  background: rgba(250, 250, 248, 0.92);
   z-index: 200;
   align-items: center;
   justify-content: center;
@@ -771,14 +882,14 @@ html, body {
 .loading-logo {
   font-family: 'DM Serif Display', serif;
   font-size: 22px;
-  color: var(--rose);
+  color: var(--text);
 }
 
 .loading-spinner {
   width: 32px;
   height: 32px;
   border: 3px solid var(--border);
-  border-top-color: var(--rose);
+  border-top-color: var(--gold);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }
@@ -790,38 +901,55 @@ html, body {
 /* Tablet / desktop: restaura aparência de card centralizado */
 @media (min-width: 480px) {
   html, body { overflow: auto; }
+  body { padding: 1rem; }
   #app {
     max-width: 420px;
-    border-radius: 20px;
+    border-radius: 24px;
     border: 0.5px solid var(--border);
-    box-shadow: 0 4px 32px rgba(192,82,110,0.08);
+    box-shadow: 0 8px 40px rgba(14, 14, 14, 0.08);
     height: auto;
     min-height: 600px;
     margin: 1rem auto;
   }
   .screen { height: auto; min-height: 600px; }
   .screen.active { height: auto; }
+
+  /* Modais voltam a ficar centralizados */
+  .modal-bg:not(#modal-confirm-delete) {
+    align-items: flex-start;
+    padding-top: 20px;
+  }
+  .modal-bg:not(#modal-confirm-delete) .modal {
+    width: 90%;
+    max-width: 360px;
+    margin-bottom: 20px;
+    border-radius: 20px;
+    max-height: none;
+    padding-bottom: 1.25rem;
+  }
 }
+
 /* ══════════════════════════════════════════
    BRONZE — formulário e preview
 ══════════════════════════════════════════ */
 
 .bronze-info {
   font-size: 12px;
-  color: var(--rose);
-  background: var(--rose-light);
-  border-radius: 8px;
-  padding: 8px 12px;
-  margin-bottom: 12px;
+  color: var(--gold-dark);
+  background: var(--gold-light);
+  border: 0.5px solid var(--gold-border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
   line-height: 1.5;
 }
 
 .bronze-preview {
   display: flex;
   justify-content: space-between;
-  background: var(--bg2);
+  background: var(--bg);
   border: 0.5px solid var(--border);
-  border-radius: 8px;
+  border-radius: 12px;
   padding: 10px 14px;
   margin-top: 4px;
   margin-bottom: 8px;
@@ -832,6 +960,14 @@ html, body {
 .bronze-preview strong {
   color: var(--text);
   font-weight: 500;
+  white-space: nowrap;
+}
+
+/* Prévia "Você recebe / Salão recebe" escondida só na tela Registrar.
+   O elemento continua no HTML porque o script.js o atualiza;
+   no modal de edição da proprietária (#m-bronze-preview) ela continua visível. */
+#bronze-preview {
+  display: none !important;
 }
 
 /* ══════════════════════════════════════════
@@ -841,7 +977,7 @@ html, body {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 .period-nav .quinzena-badge {
@@ -851,25 +987,23 @@ html, body {
 }
 
 .period-nav-btn {
-  background: none;
+  background: var(--bg);
   border: 0.5px solid var(--border);
-  border-radius: 8px;
-  width: 32px;
-  height: 32px;
+  border-radius: 50%;
+  width: 34px;
+  height: 34px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 14px;
-  color: var(--muted);
+  color: var(--navy);
   cursor: pointer;
   font-family: 'DM Sans', sans-serif;
   flex-shrink: 0;
   transition: all .15s;
 }
 .period-nav-btn:hover:not(:disabled) {
-  background: var(--bg);
-  color: var(--rose);
-  border-color: var(--rose-mid);
+  border-color: var(--navy);
 }
 .period-nav-btn:disabled {
   opacity: 0.3;
@@ -884,13 +1018,16 @@ html, body {
   flex-direction: column;
   gap: 0;
   padding: 0;
+  background: var(--bg);
+  border-bottom: 0.5px solid var(--border);
+  color: var(--muted);
 }
 
 .hist-mensal-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 14px;
+  padding: 9px 16px;
   border-bottom: 0.5px solid var(--border);
   font-size: 12px;
 }
@@ -911,7 +1048,7 @@ html, body {
 .hist-mensal-val.neg { color: var(--danger); }
 
 .hist-mensal-total {
-  background: var(--bg2);
+  background: var(--gold-light);
 }
 .hist-mensal-total .hist-mensal-label {
   font-weight: 500;
@@ -934,15 +1071,15 @@ html, body {
 .delete-btn {
   font-size: 11px;
   padding: 3px 10px;
-  border: 0.5px solid #f5c6c6;
-  border-radius: 6px;
+  border: 0.5px solid #ecc9c3;
+  border-radius: 999px;
   background: none;
   color: var(--danger);
   cursor: pointer;
   font-family: 'DM Sans', sans-serif;
 }
 .delete-btn:hover {
-  background: #fdf0f0;
+  background: var(--danger-soft);
 }
 
 /* ══════════════════════════════════════════
@@ -959,7 +1096,7 @@ html, body {
 }
 
 .modal-confirm-title {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 500;
   color: var(--text);
   margin-bottom: 6px;
@@ -980,7 +1117,7 @@ html, body {
 .btn-confirm-cancel {
   flex: 1;
   padding: 11px;
-  border-radius: 8px;
+  border-radius: 999px;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -990,13 +1127,13 @@ html, body {
   color: var(--danger);
 }
 .btn-confirm-cancel:hover {
-  background: #fdf0f0;
+  background: var(--danger-soft);
 }
 
 .btn-confirm-ok {
   flex: 1;
   padding: 11px;
-  border-radius: 8px;
+  border-radius: 999px;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
