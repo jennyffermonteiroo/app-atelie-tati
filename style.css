@@ -1145,3 +1145,46 @@ body { padding: 0; }
 .btn-confirm-ok:hover {
   opacity: .9;
 }
+
+/* ══════════════════════════════════════════
+   BRONZE — destaque da parte do salão (só visual,
+   o valor já está incluso nos 30% salão)
+══════════════════════════════════════════ */
+.bronze-bullet {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--gold-light);
+  border: 0.5px solid var(--gold-border);
+  border-radius: 999px;
+  padding: 8px 16px;
+  margin: -4px 0 1rem;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--gold-dark);
+}
+.bronze-bullet-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--gold);
+  margin-right: 8px;
+  vertical-align: middle;
+}
+.bronze-bullet small {
+  display: block;
+  font-size: 10.5px;
+  opacity: 0.8;
+  margin-left: 15px;
+}
+.bronze-bullet b {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.hist-bronze-bullet {
+  margin: 10px 14px 12px;
+}

@@ -931,6 +931,8 @@ function renderDonaPainel() {
   document.getElementById('d-30-quin').textContent   = brl(salaM);
   document.getElementById('d-desp-q').textContent    = brl(despM);
   document.getElementById('d-liq-salao').textContent = brl(liqSalao);
+  // Só exibição: valor já está somado em salaM, não entra em nenhum cálculo
+  document.getElementById('d-bronze-salao').textContent = brl(trinta_bronze);
 
   // Desabilita botão → quando estiver no mês atual
   const navBtns = document.querySelectorAll('#s-dona .period-nav-btn');
@@ -1169,6 +1171,13 @@ function renderHistoricoMensal() {
               <span class="hist-mensal-label">Total líquido</span>
               <span class="hist-mensal-val" style="color:${liq >= 0 ? 'var(--success)' : 'var(--danger)'}">${escapeHtml(brl(liq))}</span>
             </div>
+          </div>
+          <div class="bronze-bullet hist-bronze-bullet">
+            <span class="bronze-bullet-label">
+              <span class="bronze-bullet-dot"></span>Bronze · parte do salão (mês)
+              <small>já incluso nos 30% salão</small>
+            </span>
+            <b>${escapeHtml(brl(trinta_bronze))}</b>
           </div>
         </div>
       </div>`;
