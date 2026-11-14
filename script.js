@@ -315,6 +315,24 @@ function rowToFechamento(row) {
   };
 }
 
+/**
+ * Busca todas as linhas de uma consulta, em blocos de 1000.
+ * O Supabase devolve no máximo 1000 linhas por requisição; sem isso,
+ * os lançamentos mais antigos ficavam de fora do app.
+ * `buildQuery` deve criar a consulta já ordenada (com desempate por id).
+ */
+async function fetchAllRows(buildQuery) {
+  const PAGE = 1000;
+  const rows = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await buildQuery().range(from, from + PAGE - 1);
+    if (error) return { data: null, error };
+    rows.push(...(data || []));
+    if (!data || data.length < PAGE) break;
+  }
+  return { data: rows, error: null };
+}
+
 async function loadAll() {
   showLoading(true);
   try {
@@ -322,8 +340,10 @@ async function loadAll() {
 
     if (currentUser.role === 'dona') {
       const [rRecords, rDespesas, rFechamentos] = await Promise.all([
-        db.from('records').select('*').order('data_ref', { ascending: false }),
-        db.from('despesas').select('*').order('data_ref', { ascending: false }),
+        fetchAllRows(() => db.from('records').select('*')
+          .order('data_ref', { ascending: false }).order('id', { ascending: false })),
+        fetchAllRows(() => db.from('despesas').select('*')
+          .order('data_ref', { ascending: false }).order('id', { ascending: false })),
         db.from('caixa_fechamentos').select('*').order('criado_em', { ascending: false }),
       ]);
 
@@ -337,11 +357,12 @@ async function loadAll() {
       return;
     }
 
-    const { data, error } = await db
+    const { data, error } = await fetchAllRows(() => db
       .from('records')
       .select('*')
       .eq('user_key', currentUser.key)
-      .order('data_ref', { ascending: false });
+      .order('data_ref', { ascending: false })
+      .order('id', { ascending: false }));
 
     if (error) throw error;
 
